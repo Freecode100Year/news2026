@@ -13,7 +13,7 @@
   :root {
     --void: #08080A;
     --text-primary: #F5F5F0;
-    --text-dim: #5B5C62;
+    --text-dim: #6B6C72;
     --hair: #26272C;
     --live: #FF4D5E;
     --cue: #3DDC84;
@@ -58,21 +58,30 @@
   #canvasFrame:active { cursor: grabbing; }
   #stage { position: absolute; inset: 0; display: flex; justify-content: center; }
   
-  /* 眼神专注模式：宽度限制在 46% 镜头中央，瞳孔无摆动 */
   #track { width: min(860px, 92vw); padding-top: 50vh; padding-bottom: 50vh; will-change: transform; transition: width 0.3s ease; }
   #track.eye-guard { width: min(480px, 68vw) !important; text-align: center; }
 
   #script {
-    font-size: 48px; line-height: 1.55; font-weight: 600;
-    white-space: pre-wrap; word-break: break-word; transition: font-size 0.2s;
+    font-size: 48px; line-height: 1.6; font-weight: 600;
+    white-space: pre-wrap; word-break: break-word; transition: font-size 0.2s, transform 0.3s ease;
   }
-  #script.mirrored { transform: scaleX(-1); }
+  #script.mirror-x { transform: scaleX(-1); }
+  #script.mirror-y { transform: scaleY(-1); }
+  #script.mirror-xy { transform: scale(-1, -1); }
 
   .para { margin: 0 0 1.2em 0; transition: opacity 0.3s, transform 0.3s; opacity: 0.35; filter: blur(0.3px); }
   .para.focus-active { opacity: 1 !important; filter: none !important; font-weight: 700; }
   .para.role-a { border-left: 4px solid var(--anchor-a); padding-left: 12px; }
   .para.role-b { border-left: 4px solid var(--anchor-b); padding-left: 12px; }
+  .para.breaking-news { border: 2px solid var(--live); padding: 10px; border-radius: 8px; background: rgba(255,77,94,0.1); animation: flashBorder 2s infinite; }
   .para.dimmed { opacity: 0.15 !important; }
+
+  @keyframes flashBorder { 0%,100% { border-color: var(--live); } 50% { border-color: transparent; } }
+
+  /* 拼音与重音渲染 */
+  ruby { ruby-position: over; }
+  rt { font-size: 0.45em; color: var(--cue); font-weight: normal; font-family: var(--mono); }
+  strong.emphasis { color: var(--amber); text-decoration: underline; text-underline-offset: 6px; }
 
   #focusline { position: fixed; left: 0; right: 0; top: 50%; height: 2px; background: linear-gradient(to right, transparent, rgba(61,220,132,0.3), transparent); z-index: 5; pointer-events: none; }
 
@@ -124,7 +133,7 @@
   #drawer.open { transform: translateX(0); }
   #drawer h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin: 16px 0 10px 0; }
   #drawer label { font-size: 12px; color: var(--text-dim); display: flex; justify-content: space-between; margin-bottom: 6px; }
-  #drawer input[type=range] { width: 100%; margin-bottom: 14px; accent-color: var(--cue); cursor: pointer; }
+  #drawer input[type=range], #drawer select { width: 100%; margin-bottom: 14px; accent-color: var(--cue); cursor: pointer; background:#1A1B20; color:#fff; border:1px solid var(--hair); padding:6px; border-radius:6px; }
   #closeDrawer { position: absolute; top: 14px; right: 14px; background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
 </style>
 </head>
@@ -170,9 +179,17 @@
 
 <div id="drawer">
   <button id="closeDrawer">✕</button>
-  <h3 style="margin-top:0;">眼神与出镜保护</h3>
+  <h3 style="margin-top:0;">硬件反射屏镜像控制</h3>
+  <label>镜像维度</label>
+  <select id="mirrorSelect">
+    <option value="none">不镜像 (常规屏幕)</option>
+    <option value="x">左右翻转 (常见硬件分光屏)</option>
+    <option value="y">上下翻转 (倒装倒挂反射屏)</option>
+    <option value="xy">双向完全翻转</option>
+  </select>
+  <h3>眼神与出镜保护</h3>
   <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-    <span>自然出镜 (文本收窄视角)</span>
+    <span>自然出镜 (文本视角收窄)</span>
     <input type="checkbox" id="eyeGuardCheck" checked style="accent-color:var(--cue);">
   </label>
   <h3 style="margin-top:20px;">本地独立字号与行距</h3>
@@ -213,7 +230,7 @@
 
   window.addEventListener('offline', () => {
     document.getElementById('tally').className = 'tally local';
-    showToast('⚠️ 网络已断开，已自动切换为本地离线防灾播放模式', 'warning', 4500);
+    showToast('⚠️ 网络已断开，自动切换为本地离线防灾模式', 'warning', 4500);
   });
   window.addEventListener('online', () => {
     showToast('🌐 物理网络已恢复，正在恢复云端频道连接', 'info', 3000);
@@ -237,7 +254,6 @@
 
     if (params.get('room')) connectRoom();
     
-    // 监听鼠标滚轮与键盘按键，方便主播跟播微调
     window.addEventListener('wheel', (e) => {
       const delta = e.deltaY > 0 ? 0.02 : -0.02;
       state.scrollRatio = Math.max(0, Math.min(1, state.scrollRatio + delta));
@@ -248,6 +264,12 @@
       if (e.code === 'Space') {
         state.playing = !state.playing;
         showToast(state.playing ? '▶ 启动滚动' : '⏸ 暂停滚动', 'info', 1500);
+      } else if (e.code === 'ArrowUp') {
+        state.scrollRatio = Math.max(0, state.scrollRatio - 0.03);
+        updateScrollPosition();
+      } else if (e.code === 'ArrowDown') {
+        state.scrollRatio = Math.min(1, state.scrollRatio + 0.03);
+        updateScrollPosition();
       }
     });
   });
@@ -279,6 +301,8 @@
         state = { ...state, ...msg.payload };
         localStorage.setItem('anchor_cached_state', JSON.stringify(state));
         renderScript();
+      } else if (msg.type === 'action' && msg.payload === 'flashCue') {
+        showToast('⚠️ 导播提示：请注意最新稿件调整！', 'warning', 4500);
       }
     };
 
@@ -300,8 +324,18 @@
     renderScript();
   });
 
+  // 解析拼音注音与重音格式
+  function parseScriptLine(line) {
+    // 替换 {字|zì} 为 ruby
+    let html = line.replace(/\{([^|]+)\|([^}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>');
+    // 替换 *重音* 为 strong
+    html = html.replace(/\*([^*]+)\*/g, '<strong class="emphasis">$1</strong>');
+    return html;
+  }
+
   function renderScript() {
-    scriptEl.className = state.mirrored ? 'mirrored' : '';
+    const mirrorMode = document.getElementById('mirrorSelect').value;
+    scriptEl.className = mirrorMode !== 'none' ? `mirror-${mirrorMode}` : (state.mirrored ? 'mirror-x' : '');
     scriptEl.style.fontSize = `${localFontSize}px`;
     scriptEl.style.lineHeight = state.lineHeight;
 
@@ -316,6 +350,10 @@
       p.className = 'para';
       p.dataset.idx = idx;
 
+      if (line.includes('[突发新闻]') || line.includes('[BREAKING]')) {
+        p.classList.add('breaking-news');
+      }
+
       if (line.includes('[主播A]') || line.startsWith('A:')) {
         p.classList.add('role-a');
         if (currentRole === 'B') p.classList.add('dimmed');
@@ -324,7 +362,7 @@
         if (currentRole === 'A') p.classList.add('dimmed');
       }
 
-      p.textContent = line;
+      p.innerHTML = parseScriptLine(line);
       scriptEl.appendChild(p);
     });
 
@@ -341,7 +379,6 @@
     }
   }
 
-  // 计算焦点线位置并反向向导播反馈视线游标
   function updateFocusHighlight(currentTop) {
     const centerY = window.innerHeight * 0.5 + currentTop;
     const paras = Array.from(scriptEl.querySelectorAll('.para'));
@@ -350,7 +387,7 @@
     paras.forEach((p, idx) => {
       const top = p.offsetTop;
       const height = p.offsetHeight;
-      if (centerY >= top && centerY <= top + height + 20) {
+      if (centerY >= top && centerY <= top + height + 25) {
         p.classList.add('focus-active');
         currentFocusIdx = idx;
       } else {
@@ -358,7 +395,6 @@
       }
     });
 
-    // 反向给导播端汇报当前所读段落
     if (currentFocusIdx !== lastReportedParaIdx && ws && ws.readyState === WebSocket.OPEN) {
       lastReportedParaIdx = currentFocusIdx;
       ws.send(JSON.stringify({
@@ -382,6 +418,7 @@
   document.getElementById('gearBtn').onclick = () => document.getElementById('drawer').classList.add('open');
   document.getElementById('closeDrawer').onclick = () => document.getElementById('drawer').classList.remove('open');
   document.getElementById('eyeGuardCheck').onchange = renderScript;
+  document.getElementById('mirrorSelect').onchange = renderScript;
   document.getElementById('localFontSlider').oninput = (e) => {
     localFontSize = parseInt(e.target.value);
     document.getElementById('localFontVal').textContent = `${localFontSize}px`;

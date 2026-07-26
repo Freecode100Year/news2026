@@ -60,6 +60,7 @@
   .editor-tools { display: flex; gap: 6px; flex-wrap: wrap; }
   .tag-btn { height: 28px; font-size: 11px; padding: 0 10px; border-radius: 6px; background: var(--panel-raised); border: 1px solid var(--hair); color: var(--text-primary); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
   .tag-btn:hover { border-color: var(--cue); color: var(--cue); }
+  .tag-btn.danger { border-color: var(--live); color: var(--live); }
 
   textarea#scriptInput {
     width: 100%; flex: 1; min-height: 200px; background: var(--panel); border: 1px solid var(--hair); border-radius: 10px;
@@ -110,7 +111,6 @@
   #timecodeReadout { font-family: var(--mono); font-size: 26px; text-align: center; letter-spacing: 0.05em; margin: 4px 0 2px 0; color: var(--text-primary); }
   #estimateReadout { text-align: center; font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-bottom: 12px; }
 
-  /* 视线反向反馈区 */
   .eye-tracker-panel { background: rgba(79,168,232,0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; font-size: 11.5px; margin-top: 6px; font-family: var(--mono); display: flex; align-items: center; justify-content: space-between; }
 
   #toastContainer {
@@ -167,16 +167,18 @@
 <main>
   <section class="editor-section">
     <div class="editor-header">
-      <label class="field-label" for="scriptInput" style="margin:0;">稿件编辑 (支持临场无感改稿与多主播双向跟播)</label>
+      <label class="field-label" for="scriptInput" style="margin:0;">稿件编辑 (注音格式: {生僻|shēng pì} / 重音: *重点*)</label>
       <div class="editor-tools">
         <button class="tag-btn" onclick="insertTag('[主播A]')">➕ 主播A</button>
         <button class="tag-btn" onclick="insertTag('[主播B]')">➕ 主播B</button>
-        <button class="tag-btn" onclick="insertTag('[合念]')">➕ 合念</button>
-        <button class="tag-btn" onclick="insertTimestamp()">⏱ 插入时间戳</button>
+        <button class="tag-btn danger" onclick="insertTag('[突发新闻] 🚨 ')">🚨 突发插播</button>
+        <button class="tag-btn" onclick="insertTag('{生僻字|shēng pì zì}')">拼音注音</button>
+        <button class="tag-btn" onclick="insertTag('*重音强调*')">重音</button>
+        <button class="tag-btn" onclick="insertTimestamp()">⏱ 时间戳</button>
       </div>
     </div>
 
-    <textarea id="scriptInput" placeholder="在此输入或粘贴稿件...&#10;&#10;[主播A] 各位观众朋友晚上好，欢迎收看新闻播报。&#10;[主播B] 晚上好，下面来看详细内容。&#10;[00:02:00] 今天的主要内容有..."></textarea>
+    <textarea id="scriptInput" placeholder="在此输入或粘贴稿件...&#10;&#10;[主播A] 各位观众朋友晚上好，欢迎收看新闻播报。&#10;[主播B] 晚上好，下面来看包含 *重点* 与 {生僻字|shēng pì zì} 的详细内容。&#10;[00:02:00] 今天的主要内容有..."></textarea>
     
     <div id="metaRow">
       <span>字数 <b id="charCount">0</b></span>
@@ -187,12 +189,12 @@
     <div class="row">
       <div class="btn-group"><button class="primary" id="pushBtn">全新覆盖推送</button><span class="btn-cap">重置并从头播报</span></div>
       <div class="btn-group"><button class="amber" id="hotPatchBtn">⚡ 临场无感改稿推送</button><span class="btn-cap">保持当前镜头不跳变</span></div>
+      <div class="btn-group"><button id="flashCueBtn" class="danger">🔔 一键召回警示</button><span class="btn-cap">主播端弹窗提醒</span></div>
       <div class="btn-group"><button id="uploadBtn">📁 导入 .txt</button><span class="btn-cap">选择本地文件</span></div>
       <input type="file" id="fileInput" accept=".txt">
       <div class="btn-group"><button id="clearBtn">清空</button><span class="btn-cap">清空编辑框</span></div>
     </div>
 
-    <!-- 主播双向视线跟播感知 -->
     <div class="eye-tracker-panel" id="eyeTrackerPanel">
       <span>👁 主播实时视线位置:</span>
       <span id="eyeTrackerDetail" style="color:var(--accent);">等待主播读稿...</span>
@@ -293,6 +295,7 @@
   const connectBtn = document.getElementById('connectBtn');
   const pushBtn = document.getElementById('pushBtn');
   const hotPatchBtn = document.getElementById('hotPatchBtn');
+  const flashCueBtn = document.getElementById('flashCueBtn');
   const playBtn = document.getElementById('playBtn');
   const connDot = document.getElementById('connDot');
   const roomText = document.getElementById('roomText');
@@ -391,7 +394,6 @@
         anchorDot.className = msg.payload.anchorOnline ? 'dot on' : 'dot off';
         anchorText.textContent = `主播端 (${msg.payload.anchorCount})`;
       } else if (msg.type === 'anchorProgress') {
-        // 接收主播视线阅读位置反向数据
         state.anchorProgress[msg.payload.role] = msg.payload.progress;
         updateEyeTrackerUI();
       }
@@ -426,6 +428,13 @@
     }
   }
 
+  function sendAction(act) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'action', payload: act }));
+      showToast('🔔 已向主播端广播警示唤醒消息', 'success');
+    }
+  }
+
   function renderState() {
     playBtn.textContent = state.playing ? '⏸' : '▶';
     document.getElementById('speedVal').textContent = `${state.speed}×`;
@@ -447,7 +456,6 @@
       const btn = document.createElement('button');
       btn.className = 'tag-btn';
       
-      // 判断是否有主播正在读此段
       let isAnchorReading = false;
       Object.values(state.anchorProgress).forEach(prog => {
         if (prog && prog.paraIdx === idx) isAnchorReading = true;
@@ -469,11 +477,12 @@
     });
   }
 
-  // 临场无感改稿：保持当前播放和位置不变，只增量更新文本
   hotPatchBtn.addEventListener('click', () => {
     sendCmd({ script: scriptInput.value });
     showToast('⚡ 临场无感改稿已推送，镜头不跳变！', 'success');
   });
+
+  flashCueBtn.addEventListener('click', () => sendAction('flashCue'));
 
   pushBtn.addEventListener('click', () => sendCmd({ script: scriptInput.value, scrollRatio: 0, playing: true }));
   playBtn.addEventListener('click', () => sendCmd({ playing: !state.playing }));
