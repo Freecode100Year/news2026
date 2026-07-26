@@ -1,10 +1,13 @@
 # 新闻直播双端提词系统 (News Prompter 2.0)
 
-> **最新版本 2.0.0 (2026-07-26) 更新日志**：
+> **最新版本 2.1.0 (2026-07-26) 更新日志**：
+> - 💬 ** Toast 消息气泡提示**：导播端/主播端任意一端网络断开或重新连接时，浮出平滑半透明 Toast 气泡提醒（`⚠️ 物理网络已断开` / `🌐 已成功连接`），状态直观明确。
+> - 💾 **云端 SQLite (Durable Object) 强持久化**：在 Cloudflare Worker 端借助 Durable Object SQLite 后端（`this.state.storage`），将房间稿件、密码、滚动进度落盘，保证即便 Cloudflare Worker 实例重启或掉线，云端数据零丢失。
+> - 📦 **端侧本地防灾缓存 (Offline Local Storage)**：导播端稿件输入防抖实时存入本地草稿；主播端收到最新推送即刻快照缓存至本地，断网或页面意外刷新时可无感瞬间恢复提词并维持按键手动控制。
 > - 🔒 **房间密码与有效期保护**：支持自定义房间密码与到期时间（1/6/24小时/永久），防止误连与房间被非法侵入。
 > - 👥 **多路主播与双人主持模式**：支持 `[主播A]` / `[主播B]` 对话区分，主播端支持独立选择视角，高亮专属台词并暗化对方台词；同时支持双端独立配置本地字号与行距。
 > - ⏱ **时间戳与直播倒计时联动**：稿件支持一键插入时间戳 `[HH:MM:SS]`，支持设定开播倒计时联动，倒计时归零自动触发 3-2-1 开播动画并启动提词滚动。
-> - 📱 **纯离线二维码安全入房**：内置纯 JS QRCode 生成库，导播端一键生成带房间号与密钥的主播专属二维码，主播扫码即用、免去繁琐输入。
+> - 📱 **纯离线二维码安全入房**：内置纯 JS QRCode 生成库，导播端一键生成带房间号与密钥的主播专属二维码，主播扫码即用。
 > - 🌐 **域名发布与 Cloudflare Workers 部署**：原生支持部署至 Cloudflare Workers + Durable Objects 架构，已绑定生产域名 `ticiqi.freedom8964.com`。
 
 ---
@@ -19,6 +22,7 @@
    - 实时播放/暂停、快进/快退、滚动速度及参考字号调节
    - 扫码邀请与复制离线一键入房链接
    - 直播倒计时联动控制器
+   - Toast 气泡断网提示与离线草稿自动补发
 
 2. **主播提词端 (`/anchor.html`)**：
    - 适配硬件反射屏（支持左右镜像翻转）
@@ -50,11 +54,11 @@ npx wrangler deploy
 ```
 news2026/
 ├── src/
-│   └── index.js              # Cloudflare Worker & Durable Object 消息路由与状态广播
+│   └── index.js              # Cloudflare Worker & Durable Object (SQLite 持久化) 消息路由与状态广播
 ├── public/
-│   ├── index.html            # 系统导航入口
-│   ├── director.html         # 导播控制台
-│   ├── anchor.html           # 主播显示端
+│   ├── index.html            # 系统导航入口 (含 GitHub 仓库入口)
+│   ├── director.html         # 导播控制台 (支持 Toast 提醒 & 离线草稿暂存)
+│   ├── anchor.html           # 主播显示端 (支持离线缓存提词 & Toast 提醒)
 │   ├── qrcode.min.js         # 纯 JS 离线二维码生成引擎
 │   └── service-worker.js     # PWA 离线缓存支持
 ├── wrangler.toml             # Cloudflare 部署与域名配置文件
