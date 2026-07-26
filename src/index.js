@@ -6,7 +6,7 @@ export class PrompterRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
-    this.sessions = new Map(); // Map<WebSocket, { role: 'director' | 'anchor', anchorRole: string }>
+    this.sessions = new Map();
     this.password = '';
     this.expiresAt = null;
 
@@ -18,7 +18,7 @@ export class PrompterRoom {
       mirrored: false,
       fontSize: 48,
       lineHeight: 1.55,
-      liveCountdown: null, // 开播倒计时目标时间戳
+      liveCountdown: null,
       hasPassword: false,
       expiresAt: null,
       updatedAt: Date.now(),
@@ -40,11 +40,10 @@ export class PrompterRoom {
     }
 
     const role = url.searchParams.get('role') === 'director' ? 'director' : 'anchor';
-    const anchorRole = url.searchParams.get('anchorRole') || 'ALL'; // 'A', 'B', 'ALL'
+    const anchorRole = url.searchParams.get('anchorRole') || 'ALL';
     const pass = url.searchParams.get('pass') || '';
 
-    // 检查密码与过期状态
-    const validateErr = this.validateAuth(pass);
+    const validateErr = this.validateAuth(pass, role);
     if (validateErr) {
       return new Response(validateErr, { status: 403 });
     }
@@ -55,9 +54,9 @@ export class PrompterRoom {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  validateAuth(pass) {
+  validateAuth(pass, role) {
     if (this.expiresAt && Date.now() > this.expiresAt) {
-      return '房间已过期，请重新生成房间';
+      return '房间已过期，请重新创建房间';
     }
     if (this.password && this.password !== pass) {
       return '房间密码错误';
@@ -69,7 +68,6 @@ export class PrompterRoom {
     ws.accept();
     this.sessions.set(ws, { role, anchorRole });
 
-    // 发送当前初始状态
     ws.send(JSON.stringify({ type: 'state', payload: this.lastState }));
     this.broadcastPresence();
 

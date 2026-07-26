@@ -273,12 +273,36 @@
   const anchorText = document.getElementById('anchorText');
   const qrModal = document.getElementById('qrModal');
 
+  const uploadBtn = document.getElementById('uploadBtn');
+  const fileInput = document.getElementById('fileInput');
+  const clearBtn = document.getElementById('clearBtn');
+
   window.addEventListener('DOMContentLoaded', () => {
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     serverInput.value = `${wsProto}//${location.host}`;
     
     scriptInput.addEventListener('input', updateScriptMeta);
     updateScriptMeta();
+  });
+
+  // 本地文件导入与清空处理
+  uploadBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      scriptInput.value = evt.target.result;
+      updateScriptMeta();
+    };
+    reader.readAsText(file);
+  });
+
+  clearBtn.addEventListener('click', () => {
+    if (confirm('确定要清空当前的稿件内容吗？')) {
+      scriptInput.value = '';
+      updateScriptMeta();
+    }
   });
 
   function updateScriptMeta() {
