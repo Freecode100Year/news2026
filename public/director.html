@@ -287,7 +287,8 @@
     script: '', scrollRatio: 0, playing: false, speed: 1, mirrored: false, fontSize: 48, lineHeight: 1.55,
     eyeContactGuard: true, liveCountdown: null, anchorProgress: {}
   };
-  let countdownTimer = null;
+  let timerInterval = null;
+  let elapsedSec = 0;
   let pendingPushPayload = null;
 
   const roomInput = document.getElementById('roomInput');
@@ -471,6 +472,26 @@
     document.getElementById('eyeGuardToggle').className = state.eyeContactGuard ? 'switch on' : 'switch';
     document.getElementById('mirrorToggle').className = state.mirrored ? 'switch on' : 'switch';
     renderJumpPoints();
+    toggleDirectorTimer(state.playing);
+  }
+
+  function toggleDirectorTimer(playing) {
+    if (playing) {
+      if (!timerInterval) {
+        timerInterval = setInterval(() => {
+          elapsedSec++;
+          const h = String(Math.floor(elapsedSec / 3600)).padStart(2, '0');
+          const m = String(Math.floor((elapsedSec % 3600) / 60)).padStart(2, '0');
+          const s = String(elapsedSec % 60).padStart(2, '0');
+          document.getElementById('timecodeReadout').textContent = `${h}:${m}:${s}`;
+        }, 1000);
+      }
+    } else {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
   }
 
   function renderJumpPoints() {
@@ -511,7 +532,17 @@
 
   flashCueBtn.addEventListener('click', () => sendAction('flashCue'));
 
-  pushBtn.addEventListener('click', () => sendCmd({ script: scriptInput.value, scrollRatio: 0, playing: true }));
+  pushBtn.addEventListener('click', () => {
+    elapsedSec = 0;
+    sendCmd({ script: scriptInput.value, scrollRatio: 0, playing: true });
+  });
+
+  document.getElementById('rewindBtn').addEventListener('click', () => sendCmd({ scrollRatio: 0 }));
+  document.getElementById('restartBtn').addEventListener('click', () => {
+    elapsedSec = 0;
+    sendCmd({ scrollRatio: 0, playing: true });
+  });
+
   playBtn.addEventListener('click', () => sendCmd({ playing: !state.playing }));
   document.getElementById('eyeGuardToggle').addEventListener('click', () => sendCmd({ eyeContactGuard: !state.eyeContactGuard }));
   document.getElementById('mirrorToggle').addEventListener('click', () => sendCmd({ mirrored: !state.mirrored }));

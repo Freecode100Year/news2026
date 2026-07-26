@@ -205,6 +205,10 @@
   let localFontSize = parseInt(localStorage.getItem('anchor_font') || '48');
   let lastReportedParaIdx = -1;
 
+  // 自动平滑滚动帧循环控制变量
+  let animFrameId = null;
+  let lastAnimTime = 0;
+
   const setup = document.getElementById('setup');
   const roomInput = document.getElementById('roomInput');
   const passInput = document.getElementById('passInput');
@@ -257,6 +261,7 @@
 
     if (params.get('room')) connectRoom();
     
+    // 监听滚轮与按键手动跟播
     window.addEventListener('wheel', (e) => {
       const delta = e.deltaY > 0 ? 0.02 : -0.02;
       state.scrollRatio = Math.max(0, Math.min(1, state.scrollRatio + delta));
@@ -265,8 +270,7 @@
 
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
-        state.playing = !state.playing;
-        showToast(state.playing ? '▶ 启动滚动' : '⏸ 暂停滚动', 'info', 1500);
+        togglePlayState(!state.playing);
       } else if (e.code === 'ArrowUp') {
         state.scrollRatio = Math.max(0, state.scrollRatio - 0.03);
         updateScrollPosition();
@@ -276,6 +280,52 @@
       }
     });
   });
+
+  function togglePlayState(playing) {
+    state.playing = playing;
+    showToast(state.playing ? '▶ 启动自动滚动' : '⏸ 暂停滚动', 'info', 1500);
+    if (state.playing) {
+      startScrollLoop();
+    } else {
+      stopScrollLoop();
+    }
+  }
+
+  // 核心：基于 requestAnimationFrame 的毫秒级平滑自动跟播循环引擎
+  function startScrollLoop() {
+    stopScrollLoop();
+    lastAnimTime = performance.now();
+
+    function step(now) {
+      if (!state.playing) return;
+      const dt = (now - lastAnimTime) / 1000;
+      lastAnimTime = now;
+
+      const totalHeight = trackEl.scrollHeight - window.innerHeight;
+      if (totalHeight > 0) {
+        // 基准播报速率 (px/s)，结合导播 speed 系数
+        const speedPxPerSec = 42 * (state.speed || 1);
+        const deltaRatio = (speedPxPerSec * dt) / totalHeight;
+        state.scrollRatio = Math.min(1, state.scrollRatio + deltaRatio);
+        updateScrollPosition();
+
+        if (state.scrollRatio >= 1) {
+          state.playing = false;
+          showToast('🏁 已到达稿件末尾', 'info', 2000);
+          return;
+        }
+      }
+      animFrameId = requestAnimationFrame(step);
+    }
+    animFrameId = requestAnimationFrame(step);
+  }
+
+  function stopScrollLoop() {
+    if (animFrameId) {
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
+    }
+  }
 
   document.getElementById('connectBtn').addEventListener('click', connectRoom);
 
@@ -305,9 +355,17 @@
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'state') {
+        const wasPlaying = state.playing;
         state = { ...state, ...msg.payload };
         localStorage.setItem('anchor_cached_state', JSON.stringify(state));
         renderScript();
+
+        // 联动开启或取消自动滚动
+        if (state.playing) {
+          startScrollLoop();
+        } else {
+          stopScrollLoop();
+        }
       } else if (msg.type === 'action' && msg.payload === 'flashCue') {
         showToast('⚠️ 导播提示：请注意最新稿件调整！', 'warning', 4500);
       }
