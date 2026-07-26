@@ -2,6 +2,10 @@ name = "prompter"
 main = "src/index.js"
 compatibility_date = "2026-07-24"
 
+routes = [
+  { pattern = "ticiqi.freedom8964.com", custom_domain = true }
+]
+
 [assets]
 directory = "./public"
 binding = "ASSETS"
@@ -12,11 +16,7 @@ class_name = "PrompterRoom"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["PrompterRoom"]
-
-routes = [
-  { pattern = "ticiqi.freedom8964.com", custom_domain = true }
-]
+new_sqlite_classes = ["PrompterRoom"]
 
 [observability]
 enabled = true
