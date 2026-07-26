@@ -30,7 +30,6 @@
     font-family: var(--sans); color: var(--text-primary);
   }
 
-  /* ---- 顶部状态条对齐校正 ---- */
   #statusbar {
     position: fixed; top: 0; left: 0; right: 0; height: 44px;
     display: flex; align-items: center; gap: 12px; padding: 0 16px;
@@ -55,7 +54,6 @@
   }
   #gearBtn:hover { border-color: var(--cue); color: var(--cue); }
 
-  /* ---- 提词画布自适应 ---- */
   #canvasFrame { position: fixed; inset: 0; }
   #stage { position: absolute; inset: 0; display: flex; justify-content: center; }
   #track { width: min(900px, 92vw); padding-top: 50vh; padding-bottom: 50vh; will-change: transform; }
@@ -72,7 +70,6 @@
 
   #focusline { position: fixed; left: 0; right: 0; top: 50%; height: 1px; background: rgba(255,255,255,0.1); z-index: 5; pointer-events: none; }
 
-  /* ---- 倒计时开场遮罩 ---- */
   #cdOverlay {
     position: fixed; inset: 0; z-index: 90; display: none; flex-direction: column;
     align-items: center; justify-content: center; background: rgba(8,8,10,0.95);
@@ -81,7 +78,6 @@
   #cdOverlay .sub { font-size: 18px; color: var(--amber); letter-spacing: 0.1em; margin-bottom: 20px; }
   #cdOverlay .num { font-size: 140px; font-weight: 800; color: var(--cue); line-height: 1; }
 
-  /* ---- 连接设置遮罩 ---- */
   #setup {
     position: fixed; inset: 0; background: var(--void); display: flex;
     flex-direction: column; align-items: center; justify-content: center;
@@ -100,7 +96,20 @@
   }
   #errorTip { color: var(--live); font-size: 12.5px; margin-top: 4px; display: none; }
 
-  /* ---- 设置抽屉 ---- */
+  /* Toast 消息气泡 */
+  #toastContainer {
+    position: fixed; top: 56px; right: 16px; z-index: 999; display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+  }
+  .toast {
+    background: rgba(20,21,25,0.92); border: 1px solid var(--hair); border-radius: 10px; padding: 10px 16px;
+    font-size: 12px; color: var(--text-primary); box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: flex; align-items: center; gap: 8px; backdrop-filter: blur(10px);
+    transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: auto;
+  }
+  .toast.show { transform: translateX(0); }
+  .toast.warning { border-color: var(--amber); color: var(--amber); }
+  .toast.success { border-color: var(--cue); color: var(--cue); }
+
   #drawer {
     position: fixed; top: 0; right: 0; bottom: 0; width: min(300px, 85vw);
     background: #121317; border-left: 1px solid var(--hair); z-index: 95;
@@ -116,54 +125,56 @@
 </head>
 <body>
 
-  <div id="setup">
-    <h1>提词器 · 主播端</h1>
-    <p class="desc">输入导播提供的房间码以连接频道。</p>
-    <input id="roomInput" maxlength="12" placeholder="房间码" autocapitalize="characters">
-    <input id="passInput" placeholder="房间密码(若设置)" type="password">
-    <input id="serverInput" placeholder="服务器地址" style="font-size:13px; text-transform:none;">
-    <button class="primary" id="connectBtn">进入房间</button>
-    <div id="errorTip"></div>
-  </div>
+<div id="toastContainer"></div>
 
-  <div id="statusbar">
-    <button id="gearBtn" title="打开设置">⚙</button>
-    <span class="tally" id="tally"></span>
-    <span id="roomLabel">未连接</span>
-    <select id="roleSelector">
-      <option value="ALL">视角: 全员台词</option>
-      <option value="A">视角: 主播 A (主台)</option>
-      <option value="B">视角: 主播 B (副台)</option>
-    </select>
-  </div>
+<div id="setup">
+  <h1>提词器 · 主播端</h1>
+  <p class="desc">输入导播提供的房间码以连接频道。</p>
+  <input id="roomInput" maxlength="12" placeholder="房间码" autocapitalize="characters">
+  <input id="passInput" placeholder="房间密码(若设置)" type="password">
+  <input id="serverInput" placeholder="服务器地址" style="font-size:13px; text-transform:none;">
+  <button class="primary" id="connectBtn">进入房间</button>
+  <div id="errorTip"></div>
+</div>
 
-  <div id="focusline"></div>
-  
-  <div id="canvasFrame">
-    <div id="stage">
-      <div id="track">
-        <div id="script"><div class="para">等待导播推送稿件...</div></div>
-      </div>
+<div id="statusbar">
+  <button id="gearBtn" title="打开设置">⚙</button>
+  <span class="tally" id="tally"></span>
+  <span id="roomLabel">未连接</span>
+  <select id="roleSelector">
+    <option value="ALL">视角: 全员台词</option>
+    <option value="A">视角: 主播 A (主台)</option>
+    <option value="B">视角: 主播 B (副台)</option>
+  </select>
+</div>
+
+<div id="focusline"></div>
+
+<div id="canvasFrame">
+  <div id="stage">
+    <div id="track">
+      <div id="script"><div class="para">等待导播推送稿件...</div></div>
     </div>
   </div>
+</div>
 
-  <div id="cdOverlay">
-    <div class="sub">直播即将开始</div>
-    <div class="num" id="cdNum">10</div>
-  </div>
+<div id="cdOverlay">
+  <div class="sub">直播即将开始</div>
+  <div class="num" id="cdNum">10</div>
+</div>
 
-  <div id="drawer">
-    <button id="closeDrawer">✕</button>
-    <h3 style="margin-top:0;">本地独立字号与行距</h3>
-    <label>字号大小 <span id="localFontVal" style="font-family:var(--mono); color:var(--cue);">48px</span></label>
-    <input type="range" id="localFontSlider" min="28" max="96" step="2" value="48">
-    <label>行间距</label>
-    <input type="range" id="localLineSlider" min="1.2" max="2.2" step="0.05" value="1.55">
-    <h3 style="margin-top:20px;">显示设置</h3>
-    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-      <input type="checkbox" id="overrideFontCheck" style="accent-color:var(--cue);"> 强制跟随导播字号
-    </label>
-  </div>
+<div id="drawer">
+  <button id="closeDrawer">✕</button>
+  <h3 style="margin-top:0;">本地独立字号与行距</h3>
+  <label>字号大小 <span id="localFontVal" style="font-family:var(--mono); color:var(--cue);">48px</span></label>
+  <input type="range" id="localFontSlider" min="28" max="96" step="2" value="48">
+  <label>行间距</label>
+  <input type="range" id="localLineSlider" min="1.2" max="2.2" step="0.05" value="1.55">
+  <h3 style="margin-top:20px;">显示设置</h3>
+  <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+    <input type="checkbox" id="overrideFontCheck" style="accent-color:var(--cue);"> 强制跟随导播字号
+  </label>
+</div>
 
 <script>
   let ws = null;
@@ -180,9 +191,39 @@
   const errorTip = document.getElementById('errorTip');
   const roleSelector = document.getElementById('roleSelector');
 
+  function showToast(msg, type = 'info', duration = 3500) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = msg;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
+  }
+
+  window.addEventListener('offline', () => {
+    document.getElementById('tally').className = 'tally local';
+    showToast('⚠️ 网络已断开，已自动切换为本地离线防灾播放模式', 'warning', 4500);
+  });
+  window.addEventListener('online', () => {
+    showToast('🌐 物理网络已恢复，正在恢复云端频道连接', 'info', 3000);
+  });
+
   window.addEventListener('DOMContentLoaded', () => {
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     serverInput.value = `${wsProto}//${location.host}`;
+
+    // 优先读取本地持久化离线缓存
+    const cachedState = localStorage.getItem('anchor_cached_state');
+    if (cachedState) {
+      try {
+        state = { ...state, ...JSON.parse(cachedState) };
+        renderScript();
+      } catch (e) {}
+    }
 
     const params = new URLSearchParams(location.search);
     if (params.get('room')) roomInput.value = params.get('room').toUpperCase();
@@ -209,18 +250,23 @@
       setup.style.display = 'none';
       document.getElementById('tally').className = 'tally live';
       document.getElementById('roomLabel').textContent = `房间: ${room}`;
+      showToast('🌐 已成功与导播控制台连通', 'success');
     };
 
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'state') {
         state = { ...state, ...msg.payload };
+        // 实时写入本地强缓存，保障断网零数据丢失
+        localStorage.setItem('anchor_cached_state', JSON.stringify(state));
         renderScript();
       }
     };
 
     ws.onerror = () => { showError('连接错误或密码无效'); };
     ws.onclose = (e) => {
+      document.getElementById('tally').className = 'tally local';
+      showToast('⚠️ 网络已断开，提词器维持本地模式滚动', 'warning', 4000);
       if (setup.style.display !== 'none') showError(e.reason || '无法进入房间，请检查密码或房间码');
     };
   }
@@ -242,13 +288,12 @@
     scriptEl.style.fontSize = `${finalSize}px`;
     scriptEl.style.lineHeight = state.lineHeight;
 
-    const lines = state.script.split('\n');
+    const lines = (state.script || '').split('\n');
     scriptEl.innerHTML = '';
 
     lines.forEach(line => {
       const p = document.createElement('div');
       p.className = 'para';
-      let text = line;
 
       if (line.includes('[主播A]') || line.startsWith('A:')) {
         p.classList.add('role-a');
@@ -258,7 +303,7 @@
         if (currentRole === 'A') p.classList.add('dimmed');
       }
 
-      p.textContent = text;
+      p.textContent = line;
       scriptEl.appendChild(p);
     });
 

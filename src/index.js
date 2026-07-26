@@ -1,5 +1,6 @@
 /**
  * 新闻提词器一体化 Worker & Durable Object (PrompterRoom)
+ * 接入 Durable Object SQLite/Key-Value 存储，实现断网与重启零数据丢失
  */
 
 export class PrompterRoom {
@@ -23,6 +24,16 @@ export class PrompterRoom {
       expiresAt: null,
       updatedAt: Date.now(),
     };
+
+    // 从 DO 持久化存储中加载上次存储的房间数据
+    this.state.blockConcurrencyWhile(async () => {
+      const saved = await this.state.storage.get('roomState');
+      if (saved) {
+        this.lastState = { ...this.lastState, ...saved };
+        this.password = saved.password || '';
+        this.expiresAt = saved.expiresAt || null;
+      }
+    });
   }
 
   async fetch(request) {
@@ -109,6 +120,13 @@ export class PrompterRoom {
       expiresAt: this.expiresAt,
       updatedAt: Date.now(),
     };
+
+    // 写入 Durable Object 持久化 SQLite / KeyValue 数据库，防止断网与实例重启掉数据
+    this.state.storage.put('roomState', {
+      ...this.lastState,
+      password: this.password,
+      expiresAt: this.expiresAt,
+    }).catch(() => {});
   }
 
   broadcast(message, exclude) {
