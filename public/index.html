@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>新闻直播提词系统 · NewsPrompter 2026</title>
+<title>新闻直播提词系统 · NewsPrompter 2.0</title>
 <style>
   :root {
     --bg: #0F1015; --panel: #1A1B22; --border: #2A2B35;
@@ -15,14 +15,35 @@
   body {
     margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
     font-family: var(--sans); display: flex; flex-direction: column;
-    align-items: center; justify-content: center; padding: 40px 20px;
+    align-items: center; justify-content: flex-start;
   }
-  .hero { text-align: center; max-width: 600px; margin-bottom: 40px; }
+
+  /* 顶部全宽通知与 GitHub 仓库公布栏 */
+  .top-bar {
+    width: 100%; background: #16171E; border-bottom: 1px solid var(--border);
+    padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; flex-wrap: wrap; gap: 10px;
+  }
+  .top-bar .brand { font-weight: 700; font-family: var(--mono); color: var(--cue); display: flex; align-items: center; gap: 6px; }
+  .github-banner-btn {
+    display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 5px 14px;
+    color: var(--text); text-decoration: none; font-size: 12.5px; font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  .github-banner-btn:hover { background: var(--cue); color: #05130B; border-color: var(--cue); font-weight: 700; }
+  .github-icon { width: 16px; height: 16px; fill: currentColor; }
+
+  .content-wrap {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    flex: 1; padding: 40px 20px; width: 100%; max-width: 900px;
+  }
+  .hero { text-align: center; max-width: 640px; margin-bottom: 36px; }
   .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; background: rgba(61,220,132,0.15); color: var(--cue); font-family: var(--mono); font-size: 12px; font-weight: 600; margin-bottom: 16px; border: 1px solid rgba(61,220,132,0.3); }
   h1 { font-size: 28px; margin: 0 0 12px 0; font-weight: 800; letter-spacing: -0.02em; }
   p.sub { color: var(--dim); font-size: 14px; margin: 0; line-height: 1.6; }
   
-  .cards { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; max-width: 720px; width: 100%; }
+  .cards { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; width: 100%; }
   a.card {
     display: flex; flex-direction: column; flex: 1; min-width: 300px; padding: 28px; border-radius: 16px;
     background: var(--panel); border: 1px solid var(--border); text-decoration: none; color: var(--text);
@@ -37,42 +58,54 @@
   .card-features { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; flex-wrap: wrap; gap: 8px; }
   .feat-tag { font-size: 11px; font-family: var(--mono); background: rgba(255,255,255,0.05); padding: 3px 8px; border-radius: 6px; color: var(--dim); }
 
-  footer { margin-top: 48px; font-family: var(--mono); font-size: 12px; color: var(--dim); text-align: center; }
+  footer { margin-top: 40px; font-family: var(--mono); font-size: 12px; color: var(--dim); text-align: center; }
 </style>
 </head>
 <body>
-  <div class="hero">
-    <div class="badge">PROMPTER 2.0</div>
-    <h1>新闻直播双端提词系统</h1>
-    <p class="sub">云端/局域网双轨实时同步 · 导播多视角操控 · 多路主播同步滚动与独立字号 · 二维码一键安全入房</p>
-  </div>
 
-  <div class="cards">
-    <a class="card director" href="./director.html">
-      <div class="dot"></div>
-      <h2>导播控制台 <span>→</span></h2>
-      <p>导入/编排稿件、房间密码与有效期保护、双人对话标记、时间戳与开播倒计时联动、实时扫码邀请。</p>
-      <div class="card-features">
-        <span class="feat-tag">密码保护</span>
-        <span class="feat-tag">时间戳标记</span>
-        <span class="feat-tag">开播倒计时</span>
-        <span class="feat-tag">二维码邀请</span>
-      </div>
-    </a>
-
-    <a class="card anchor" href="./anchor.html">
-      <div class="dot"></div>
-      <h2>主播端显示 <span>→</span></h2>
-      <p>双人主持独立字号与角色高亮、硬件提词器反射屏适配、全屏滚动与断网无缝自愈运行。</p>
-      <div class="card-features">
-        <span class="feat-tag">双视角支持</span>
-        <span class="feat-tag">独立字号</span>
-        <span class="feat-tag">离线自愈</span>
-        <span class="feat-tag">镜像翻转</span>
-      </div>
+  <!-- 页面最顶端高亮公布 GitHub 仓库 -->
+  <div class="top-bar">
+    <div class="brand">PROMPTER 2.0</div>
+    <a class="github-banner-btn" href="https://github.com/Freecode100Year/news2026" target="_blank" rel="noopener">
+      <svg class="github-icon" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+      <span>开源仓库: https://github.com/Freecode100Year/news2026</span>
     </a>
   </div>
 
-  <footer>新闻直播提词系统 &copy; 2026 · 支持 Cloudflare Workers &amp; Durable Objects</footer>
+  <div class="content-wrap">
+    <div class="hero">
+      <div class="badge">新闻提词器一体化系统</div>
+      <h1>新闻直播双端提词系统</h1>
+      <p class="sub">云端/局域网双轨实时同步 · 导播多视角操控 · 多路主播同步滚动与独立字号 · 二维码一键安全入房</p>
+    </div>
+
+    <div class="cards">
+      <a class="card director" href="./director.html">
+        <div class="dot"></div>
+        <h2>导播控制台 <span>→</span></h2>
+        <p>导入/编排稿件、房间密码与有效期保护、双人对话标记、时间戳与开播倒计时联动、实时扫码邀请。</p>
+        <div class="card-features">
+          <span class="feat-tag">密码保护</span>
+          <span class="feat-tag">时间戳标记</span>
+          <span class="feat-tag">开播倒计时</span>
+          <span class="feat-tag">二维码邀请</span>
+        </div>
+      </a>
+
+      <a class="card anchor" href="./anchor.html">
+        <div class="dot"></div>
+        <h2>主播端显示 <span>→</span></h2>
+        <p>双人主持独立字号与角色高亮、硬件提词器反射屏适配、全屏滚动与断网无缝自愈运行。</p>
+        <div class="card-features">
+          <span class="feat-tag">双视角支持</span>
+          <span class="feat-tag">独立字号</span>
+          <span class="feat-tag">离线自愈</span>
+          <span class="feat-tag">镜像翻转</span>
+        </div>
+      </a>
+    </div>
+
+    <footer>新闻直播提词系统 &copy; 2026 · <a href="https://github.com/Freecode100Year/news2026" style="color:inherit;" target="_blank">GitHub Repository</a></footer>
+  </div>
 </body>
 </html>
