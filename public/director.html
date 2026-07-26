@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>新闻提词器 · 导播控制台</title>
+<link rel="manifest" href="manifest-director.webmanifest">
+<link rel="apple-touch-icon" href="icon-director.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1B1C20">
+<script src="qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #1B1C20; --panel: #232428; --panel-raised: #2B2C31; --hair: #35363C;
+    --text-primary: #F5F5F0; --text-dim: #8B8C93; --live: #E8323D; --cue: #3DDC84; --amber: #E8A23D; --accent: #4FA8E8;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text-primary); font-family: var(--sans); min-height: 100vh; }
+
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--hair); background: var(--panel); flex-wrap: wrap; }
+  header h1 { font-size: 15px; font-weight: 700; margin: 0; letter-spacing: 0.02em; white-space: nowrap; }
+  .room-chip { font-family: var(--mono); font-size: 12px; background: var(--panel-raised); border: 1px solid var(--hair); border-radius: 8px; padding: 5px 10px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+  .dot.on { background: var(--cue); box-shadow: 0 0 6px 1px rgba(61,220,132,0.6); }
+  .dot.off { background: var(--live); }
+  
+  .connect-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; width: 100%; margin-top: 6px; }
+  .connect-row input, .connect-row select {
+    padding: 7px 10px; border-radius: 8px; border: 1px solid var(--hair);
+    background: var(--panel-raised); color: var(--text-primary); font-size: 12.5px;
+  }
+  #roomInput { font-family: var(--mono); width: 110px; }
+  #passInput { font-family: var(--mono); width: 100px; }
+  #serverInput { width: 220px; }
+  .field-cap { font-size: 11px; color: var(--text-dim); width: 100%; margin-top: -2px; }
+
+  main { display: grid; grid-template-columns: minmax(0,1fr) 350px; gap: 1px; background: var(--hair); }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--bg); padding: 20px; }
+
+  label.field-label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 8px; font-family: var(--mono); letter-spacing: 0.03em; }
+
+  .editor-tools { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .tag-btn { font-size: 11px; padding: 4px 8px; border-radius: 6px; background: var(--panel-raised); border: 1px solid var(--hair); color: var(--text-primary); cursor: pointer; }
+  .tag-btn:hover { border-color: var(--cue); color: var(--cue); }
+
+  textarea#scriptInput {
+    width: 100%; min-height: 300px; background: var(--panel); border: 1px solid var(--hair); border-radius: 10px;
+    color: var(--text-primary); padding: 16px; font-size: 15px; line-height: 1.7; resize: vertical; font-family: var(--sans);
+  }
+  textarea#scriptInput:focus { outline: 2px solid var(--cue); }
+
+  #metaRow { display: flex; gap: 16px; margin-top: 8px; font-family: var(--mono); font-size: 11.5px; color: var(--text-dim); flex-wrap: wrap; }
+  #metaRow b { color: var(--text-primary); }
+
+  .row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+  .btn-group { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .btn-cap { font-size: 10px; color: var(--text-dim); font-family: var(--mono); text-align: center; }
+
+  button {
+    font-family: var(--sans); border: 1px solid var(--hair); background: var(--panel-raised); color: var(--text-primary);
+    padding: 8px 14px; border-radius: 8px; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  }
+  button:hover { border-color: var(--cue); }
+  button.primary { background: var(--cue); color: #05130B; border: none; font-weight: 700; }
+  button.danger { background: var(--live); color: #FFF; border: none; font-weight: 700; }
+  button.ghost { background: transparent; color: var(--text-dim); font-size: 12px; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  input[type=file] { display: none; }
+
+  .panel-block { background: var(--panel); border: 1px solid var(--hair); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .panel-block h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin: 0 0 4px 0; display: flex; justify-content: space-between; align-items: center; }
+  .panel-block .desc { font-size: 11px; color: var(--text-dim); margin: 0 0 12px 0; line-height: 1.5; }
+
+  .transport { display: flex; align-items: center; justify-content: center; gap: 16px; }
+  #playBtn { width: 60px; height: 60px; border-radius: 50%; font-size: 22px; background: var(--cue); color: #05130B; border: none; }
+
+  .slider-row { margin-bottom: 14px; }
+  .slider-row .val { float: right; font-family: var(--mono); color: var(--cue); font-size: 12px; }
+  input[type=range] { width: 100%; accent-color: var(--cue); }
+
+  .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 12.5px; border-top: 1px solid var(--hair); }
+  .toggle-row:first-child { border-top: none; }
+  .switch { width: 38px; height: 20px; border-radius: 12px; background: var(--panel-raised); border: 1px solid var(--hair); position: relative; cursor: pointer; flex-shrink: 0; }
+  .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-dim); transition: all 0.2s; }
+  .switch.on { background: rgba(61,220,132,0.2); border-color: var(--cue); }
+  .switch.on::after { left: 18px; background: var(--cue); }
+
+  #timecodeReadout { font-family: var(--mono); font-size: 26px; text-align: center; letter-spacing: 0.05em; margin: 4px 0 2px 0; color: var(--text-primary); }
+  #estimateReadout { text-align: center; font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-bottom: 12px; }
+
+  #liveCountdownBox {
+    background: rgba(232,162,61,0.1); border: 1px solid var(--amber); border-radius: 10px; padding: 10px; text-align: center; margin-bottom: 12px; display: none;
+  }
+  #liveCountdownBox .cd-val { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--amber); }
+
+  /* 扫码邀请 Modal */
+  .qr-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 200;
+  }
+  .qr-modal.show { display: flex; }
+  .qr-box { background: var(--panel); border: 1px solid var(--hair); border-radius: 16px; padding: 24px; text-align: center; width: 320px; }
+  .qr-box h3 { margin: 0 0 8px 0; font-size: 16px; }
+  .qr-box p { font-size: 12px; color: var(--text-dim); margin-bottom: 16px; }
+  #qrcode { background: #fff; padding: 12px; border-radius: 10px; display: inline-block; margin-bottom: 16px; }
+
+  #templateList { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 140px; overflow-y: auto; }
+  .template-item { display: flex; justify-content: space-between; align-items: center; background: var(--panel-raised); border: 1px solid var(--hair); border-radius: 8px; padding: 6px 10px; font-size: 12px; }
+  .template-item .tname { cursor: pointer; }
+  .template-item .tdel { color: var(--live); cursor: pointer; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>提词器 · 导播台</h1>
+  <div class="room-chip"><span class="dot" id="connDot"></span><span id="roomText">未连接</span></div>
+  <div class="room-chip"><span class="dot" id="anchorDot"></span><span id="anchorText">主播端 (0)</span></div>
+  
+  <div class="connect-row">
+    <input id="roomInput" placeholder="房间码" title="留空自动生成">
+    <input id="passInput" placeholder="房间密码" title="可选，防止误连">
+    <select id="expireSelect">
+      <option value="0">永不过期</option>
+      <option value="3600000">1 小时后到期</option>
+      <option value="21600000">6 小时后到期</option>
+      <option value="86400000" selected>24 小时后到期</option>
+    </select>
+    <input id="serverInput" placeholder="wss://ticiqi.freedom8964.com">
+    <button class="primary" id="connectBtn">连接/创建房间</button>
+  </div>
+  <div class="field-cap">设置房间密码与有效期可安全保护频道。未输入密码则任何知道房间码的主播均可加入。</div>
+</header>
+
+<main>
+  <section>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <label class="field-label" for="scriptInput">稿件编辑 (空行分段，支持双人主播与时间戳标记)</label>
+      <div class="editor-tools">
+        <button class="tag-btn" onclick="insertTag('[主播A]')">➕ 主播A</button>
+        <button class="tag-btn" onclick="insertTag('[主播B]')">➕ 主播B</button>
+        <button class="tag-btn" onclick="insertTag('[合念]')">➕ 合念</button>
+        <button class="tag-btn" onclick="insertTimestamp()">⏱ 插入时间戳</button>
+      </div>
+    </div>
+
+    <textarea id="scriptInput" placeholder="在在此输入或粘贴稿件...&#10;&#10;[主播A] 各位观众朋友晚上好，欢迎收看新闻播报。&#10;[主播B] 晚上好，下面来看详细内容。&#10;[00:02:00] 今天的主要内容有..."></textarea>
+    
+    <div id="metaRow">
+      <span>字数 <b id="charCount">0</b></span>
+      <span>预计时长 <b id="etaLabel">--:--</b></span>
+      <span id="autosaveTip" style="color:var(--cue);"></span>
+    </div>
+
+    <div class="row">
+      <div class="btn-group"><button class="primary" id="pushBtn">推送到主播端</button><span class="btn-cap">更新稿件并重置滚动</span></div>
+      <div class="btn-group"><button id="uploadBtn">📁 导入 .txt</button><span class="btn-cap">选择本地文件</span></div>
+      <input type="file" id="fileInput" accept=".txt">
+      <div class="btn-group"><button id="clearBtn">清空</button><span class="btn-cap">清空编辑文本</span></div>
+    </div>
+
+    <div class="panel-block" style="margin-top:20px;">
+      <h2>段落及时间戳跳转</h2>
+      <p class="desc">稿件分段锚点，点击可直接跳到指定台词段落</p>
+      <div class="row" id="paraJumpRow"><span class="field-cap">推送稿件后在此自动生成跳转列表。</span></div>
+    </div>
+
+    <div class="panel-block">
+      <h2>邀请主播入房 (二维码 / 链接)</h2>
+      <p class="desc">提供自动包含密码的二维码与链接，主播扫码即可零输入连接</p>
+      <div class="row">
+        <button id="showQrBtn" class="primary" disabled>📱 显示邀请二维码</button>
+        <button id="copyLinkBtn" disabled>📋 复制邀请链接</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div id="timecodeReadout">00:00:00</div>
+    <div id="estimateReadout">按当前速度预计还需 --:--</div>
+
+    <div id="liveCountdownBox">
+      <div style="font-size:11px; color:var(--amber);">🔴 直播倒计时联动中</div>
+      <div class="cd-val" id="cdVal">00:00</div>
+      <button class="danger" style="margin-top:6px; font-size:11px; padding:4px 8px;" id="cancelCdBtn">取消倒计时</button>
+    </div>
+
+    <div class="panel-block">
+      <h2>直播倒计时联动 &amp; 播放控制</h2>
+      <p class="desc">支持设定倒计时自动触发开播与实时滚动</p>
+      
+      <div class="row" style="justify-content:center; margin-bottom:12px;">
+        <select id="cdSelect" style="padding:6px; background:var(--panel-raised); color:#fff; border:1px solid var(--hair); border-radius:6px; font-size:12px;">
+          <option value="10">倒计时 10 秒后开播</option>
+          <option value="30">倒计时 30 秒后开播</option>
+          <option value="60">倒计时 60 秒后开播</option>
+        </select>
+        <button class="primary" id="startCdBtn">🔴 启动直播倒计时</button>
+      </div>
+
+      <div class="transport">
+        <div class="btn-group"><button id="rewindBtn">⏮</button><span class="btn-cap">回到开头</span></div>
+        <div class="btn-group"><button id="playBtn">▶</button><span class="btn-cap">播放/暂停</span></div>
+        <div class="btn-group"><button id="restartBtn">⟲</button><span class="btn-cap">重置并播放</span></div>
+      </div>
+    </div>
+
+    <div class="panel-block">
+      <h2>滚动与显示参数</h2>
+      <div class="slider-row">
+        <label class="field-label">滚动速度 <span class="val" id="speedVal">1.0×</span></label>
+        <input type="range" id="speedSlider" min="0.2" max="3" step="0.1" value="1">
+      </div>
+      <div class="slider-row">
+        <label class="field-label">参考字号 <span class="val" id="fontVal">48px</span></label>
+        <input type="range" id="fontSlider" min="28" max="96" step="2" value="48">
+      </div>
+      <div class="toggle-row">
+        <span>镜像模式 (提词器反射屏)</span>
+        <div class="switch" id="mirrorToggle"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="qr-modal" id="qrModal">
+  <div class="qr-box">
+    <h3>扫码连接主播端</h3>
+    <p>使用手机或平板相机/微信扫码即可免密直连</p>
+    <div id="qrcode"></div>
+    <div><button id="closeQrBtn">关闭</button></div>
+  </div>
+</div>
+
+<script>
+  let ws = null;
+  let roomCode = '';
+  let roomPass = '';
+  let state = {
+    script: '', scrollRatio: 0, playing: false, speed: 1, mirrored: false, fontSize: 48, lineHeight: 1.55,
+    liveCountdown: null
+  };
+  let countdownTimer = null;
+
+  // DOM 元素
+  const roomInput = document.getElementById('roomInput');
+  const passInput = document.getElementById('passInput');
+  const serverInput = document.getElementById('serverInput');
+  const scriptInput = document.getElementById('scriptInput');
+  const connectBtn = document.getElementById('connectBtn');
+  const pushBtn = document.getElementById('pushBtn');
+  const playBtn = document.getElementById('playBtn');
+  const connDot = document.getElementById('connDot');
+  const roomText = document.getElementById('roomText');
+  const anchorDot = document.getElementById('anchorDot');
+  const anchorText = document.getElementById('anchorText');
+  const qrModal = document.getElementById('qrModal');
+  let qrcodeObj = null;
+
+  // 挂载初始配置
+  window.addEventListener('DOMContentLoaded', () => {
+    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    serverInput.value = `${wsProto}//${location.host}`;
+    
+    // 监听本地稿件输入
+    scriptInput.addEventListener('input', updateScriptMeta);
+    updateScriptMeta();
+  });
+
+  function updateScriptMeta() {
+    const text = scriptInput.value;
+    document.getElementById('charCount').textContent = text.length;
+    const minutes = Math.ceil(text.length / 300);
+    document.getElementById('etaLabel').textContent = `${minutes} 分钟`;
+  }
+
+  function insertTag(tag) {
+    const start = scriptInput.selectionStart;
+    const end = scriptInput.selectionEnd;
+    const val = scriptInput.value;
+    scriptInput.value = val.substring(0, start) + tag + ' ' + val.substring(end);
+    scriptInput.focus();
+    updateScriptMeta();
+  }
+
+  function insertTimestamp() {
+    const now = new Date();
+    const ts = `[${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}]`;
+    insertTag(ts);
+  }
+
+  // 连接房间
+  connectBtn.addEventListener('click', connectRoom);
+
+  function connectRoom() {
+    if (ws) { ws.close(); }
+    roomCode = roomInput.value.trim().toUpperCase() || Math.random().toString(36).substring(2, 7).toUpperCase();
+    roomInput.value = roomCode;
+    roomPass = passInput.value.trim();
+
+    const server = serverInput.value.trim().replace(/\/$/, '');
+    const expireMs = parseInt(document.getElementById('expireSelect').value);
+    const expiresAt = expireMs > 0 ? Date.now() + expireMs : null;
+
+    const wsUrl = `${server}/room/${roomCode}/ws?role=director&pass=${encodeURIComponent(roomPass)}`;
+
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      connDot.className = 'dot on';
+      roomText.textContent = `房间: ${roomCode}`;
+      document.getElementById('showQrBtn').disabled = false;
+      document.getElementById('copyLinkBtn').disabled = false;
+
+      // 推送密码与到期时间配置
+      sendCmd({ password: roomPass, expiresAt: expiresAt });
+    };
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'state') {
+        state = { ...state, ...msg.payload };
+        renderState();
+      } else if (msg.type === 'presence') {
+        anchorDot.className = msg.payload.anchorOnline ? 'dot on' : 'dot off';
+        anchorText.textContent = `主播端 (${msg.payload.anchorCount})`;
+      }
+    };
+
+    ws.onclose = (e) => {
+      connDot.className = 'dot off';
+      roomText.textContent = '连接已断开';
+      document.getElementById('showQrBtn').disabled = true;
+    };
+  }
+
+  function sendCmd(payload) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'command', payload: payload }));
+    }
+  }
+
+  function renderState() {
+    playBtn.textContent = state.playing ? '⏸' : '▶';
+    document.getElementById('speedVal').textContent = `${state.speed}×`;
+    document.getElementById('speedSlider').value = state.speed;
+    document.getElementById('fontSlider').value = state.fontSize;
+    document.getElementById('fontVal').textContent = `${state.fontSize}px`;
+    document.getElementById('mirrorToggle').className = state.mirrored ? 'switch on' : 'switch';
+    renderJumpPoints();
+    checkLiveCountdown();
+  }
+
+  function renderJumpPoints() {
+    const wrap = document.getElementById('paraJumpRow');
+    wrap.innerHTML = '';
+    const text = state.script || '';
+    const lines = text.split('\n').filter(l => l.trim().length > 0);
+    lines.forEach((line, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'tag-btn';
+      btn.textContent = line.length > 15 ? line.substring(0, 15) + '...' : line;
+      btn.onclick = () => {
+        const ratio = idx / Math.max(1, lines.length - 1);
+        sendCmd({ scrollRatio: ratio });
+      };
+      wrap.appendChild(btn);
+    });
+  }
+
+  // 直播倒计时联动
+  document.getElementById('startCdBtn').addEventListener('click', () => {
+    const sec = parseInt(document.getElementById('cdSelect').value);
+    const target = Date.now() + sec * 1000;
+    sendCmd({ liveCountdown: target, playing: false });
+  });
+
+  document.getElementById('cancelCdBtn').addEventListener('click', () => {
+    sendCmd({ liveCountdown: null });
+  });
+
+  function checkLiveCountdown() {
+    const box = document.getElementById('liveCountdownBox');
+    if (!state.liveCountdown) {
+      box.style.display = 'none';
+      if (countdownTimer) clearInterval(countdownTimer);
+      return;
+    }
+
+    box.style.display = 'block';
+    if (countdownTimer) clearInterval(countdownTimer);
+    
+    countdownTimer = setInterval(() => {
+      const remain = Math.ceil((state.liveCountdown - Date.now()) / 1000);
+      if (remain <= 0) {
+        clearInterval(countdownTimer);
+        document.getElementById('cdVal').textContent = '00:00 - 开播！';
+        sendCmd({ liveCountdown: null, playing: true, scrollRatio: 0 });
+      } else {
+        const m = String(Math.floor(remain / 60)).padStart(2, '0');
+        const s = String(remain % 60).padStart(2, '0');
+        document.getElementById('cdVal').textContent = `${m}:${s}`;
+      }
+    }, 200);
+  }
+
+  // 邀请与二维码
+  function getInviteUrl() {
+    const server = serverInput.value.trim();
+    const host = location.origin;
+    let url = `${host}/anchor.html?room=${roomCode}`;
+    if (roomPass) url += `&pass=${encodeURIComponent(roomPass)}`;
+    return url;
+  }
+
+  document.getElementById('showQrBtn').addEventListener('click', () => {
+    const url = getInviteUrl();
+    const qrDiv = document.getElementById('qrcode');
+    qrDiv.innerHTML = '';
+    new QRCode(qrDiv, { text: url, width: 180, height: 180 });
+    qrModal.className = 'qr-modal show';
+  });
+
+  document.getElementById('closeQrBtn').addEventListener('click', () => {
+    qrModal.className = 'qr-modal';
+  });
+
+  document.getElementById('copyLinkBtn').addEventListener('click', () => {
+    navigator.clipboard.writeText(getInviteUrl());
+    alert('邀请链接已复制到剪贴板！');
+  });
+
+  // 控制绑定
+  pushBtn.addEventListener('click', () => {
+    sendCmd({ script: scriptInput.value, scrollRatio: 0, playing: true });
+  });
+  playBtn.addEventListener('click', () => sendCmd({ playing: !state.playing }));
+  document.getElementById('rewindBtn').addEventListener('click', () => sendCmd({ scrollRatio: 0 }));
+  document.getElementById('restartBtn').addEventListener('click', () => sendCmd({ scrollRatio: 0, playing: true }));
+  document.getElementById('speedSlider').addEventListener('input', (e) => sendCmd({ speed: parseFloat(e.target.value) }));
+  document.getElementById('fontSlider').addEventListener('input', (e) => sendCmd({ fontSize: parseInt(e.target.value) }));
+  document.getElementById('mirrorToggle').addEventListener('click', () => sendCmd({ mirrored: !state.mirrored }));
+</script>
+</body>
+</html>
