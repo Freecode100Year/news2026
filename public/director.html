@@ -113,7 +113,6 @@
 
   .eye-tracker-panel { background: rgba(79,168,232,0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; font-size: 11.5px; margin-top: 6px; font-family: var(--mono); display: flex; align-items: center; justify-content: space-between; }
 
-  /* 极致调优的 Glassmorphic Toast 消息气泡 */
   #toastContainer {
     position: fixed; top: 16px; right: 16px; z-index: 999; display: flex; flex-direction: column; gap: 8px; pointer-events: none;
   }
@@ -152,7 +151,7 @@
   </a>
   
   <div class="connect-row">
-    <input id="roomInput" placeholder="房间码" title="留空自动生成">
+    <input id="roomInput" placeholder="房间码" title="支持任意1-32位数字或字母">
     <input id="passInput" placeholder="房间密码" title="可选，防止误连">
     <select id="expireSelect">
       <option value="0">永不过期</option>
@@ -370,14 +369,16 @@
   connectBtn.addEventListener('click', connectRoom);
 
   function connectRoom() {
-    // 关键修正：清除旧 WS 连接的 onclose 监听器，防止手动/重复点击连接时误弹“通道断开”
     if (ws) {
       ws.onclose = null;
       ws.close();
     }
 
-    roomCode = roomInput.value.trim().toUpperCase() || Math.random().toString(36).substring(2, 7).toUpperCase();
-    roomInput.value = roomCode;
+    roomCode = roomInput.value.trim().toUpperCase();
+    if (!roomCode) {
+      roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+      roomInput.value = roomCode;
+    }
     roomPass = passInput.value.trim();
 
     const server = serverInput.value.trim().replace(/\/$/, '');
@@ -417,6 +418,10 @@
         state.anchorProgress[msg.payload.role] = msg.payload.progress;
         updateEyeTrackerUI();
       }
+    };
+
+    ws.onerror = (e) => {
+      showToast('⚠️ 房间握手失败，请检查密码或输入有效房间码', 'error');
     };
 
     ws.onclose = () => {

@@ -1,6 +1,6 @@
 /**
  * 新闻提词器一体化 Worker & Durable Object (PrompterRoom)
- * 支持直播高压场景：无感增量改稿、双向视线游标反向推送与强容灾持久化
+ * 修正房间码正则匹配，支持 1~32 位任意短房间码 (如 A1, 8, NEWS 等)
  */
 
 export class PrompterRoom {
@@ -19,9 +19,9 @@ export class PrompterRoom {
       mirrored: false,
       fontSize: 48,
       lineHeight: 1.55,
-      eyeContactGuard: true, // 默认开启自然出镜眼神收窄
+      eyeContactGuard: true,
       liveCountdown: null,
-      anchorProgress: {}, // 记录主播 A/B 的实时阅读段落位置 Map
+      anchorProgress: {},
       hasPassword: false,
       expiresAt: null,
       updatedAt: Date.now(),
@@ -101,7 +101,6 @@ export class PrompterRoom {
       this.updateStateFromDirector(msg.payload);
       this.broadcast({ type: 'state', payload: this.lastState }, ws);
     } else if (role === 'anchor' && msg.type === 'anchorProgress') {
-      // 主播反向汇报实时阅读进度 (双向游标)
       this.lastState.anchorProgress[anchorRole] = msg.payload;
       this.broadcast({ type: 'anchorProgress', payload: { role: anchorRole, progress: msg.payload } }, ws);
     } else if (msg.type === 'ping') {
@@ -157,7 +156,8 @@ export class PrompterRoom {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const match = url.pathname.match(/^\/room\/([A-Za-z0-9-]{3,32})\/ws$/);
+    // 放宽房间码正则匹配，允许 1~32 位短房间码 (如 A1, 8 等)
+    const match = url.pathname.match(/^\/room\/([A-Za-z0-9-]{1,32})\/ws$/);
 
     if (match) {
       const roomCode = match[1].toUpperCase();
