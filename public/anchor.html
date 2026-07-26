@@ -13,7 +13,7 @@
   :root {
     --void: #08080A;
     --text-primary: #F5F5F0;
-    --text-dim: #5B5C62;
+    --text-dim: #6B6C72;
     --hair: #26272C;
     --live: #FF4D5E;
     --cue: #3DDC84;
@@ -26,11 +26,11 @@
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
-    margin: 0; height: 100%; background: var(--void); overflow: hidden;
+    margin: 0; padding: 0; width: 100%; height: 100%; background: var(--void); overflow: hidden;
     font-family: var(--sans); color: var(--text-primary);
   }
 
-  /* ---- 顶部状态条 ---- */
+  /* ---- 顶部状态条对齐校正 ---- */
   #statusbar {
     position: fixed; top: 0; left: 0; right: 0; height: 44px;
     display: flex; align-items: center; gap: 12px; padding: 0 16px;
@@ -45,10 +45,17 @@
 
   #roleSelector {
     background: #141519; border: 1px solid var(--hair); color: var(--text-primary);
-    border-radius: 6px; padding: 3px 8px; font-size: 11px; font-family: var(--mono); cursor: pointer;
+    border-radius: 6px; padding: 4px 8px; font-size: 11.5px; font-family: var(--mono); cursor: pointer;
+    outline: none; height: 28px; display: inline-flex; align-items: center;
   }
 
-  /* ---- 提词画布 ---- */
+  #gearBtn {
+    background: transparent; border: 1px solid var(--hair); color: var(--text-dim); border-radius: 6px;
+    width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  }
+  #gearBtn:hover { border-color: var(--cue); color: var(--cue); }
+
+  /* ---- 提词画布自适应 ---- */
   #canvasFrame { position: fixed; inset: 0; }
   #stage { position: absolute; inset: 0; display: flex; justify-content: center; }
   #track { width: min(900px, 92vw); padding-top: 50vh; padding-bottom: 50vh; will-change: transform; }
@@ -58,16 +65,14 @@
   }
   #script.mirrored { transform: scaleX(-1); }
 
-  /* 多角色台词样式 */
   .para { margin: 0 0 1.2em 0; transition: opacity 0.3s, transform 0.3s; }
   .para.role-a { border-left: 4px solid var(--anchor-a); padding-left: 12px; }
   .para.role-b { border-left: 4px solid var(--anchor-b); padding-left: 12px; }
   .para.dimmed { opacity: 0.25; filter: blur(0.5px); }
-  .para.highlight { color: var(--cue); }
 
   #focusline { position: fixed; left: 0; right: 0; top: 50%; height: 1px; background: rgba(255,255,255,0.1); z-index: 5; pointer-events: none; }
 
-  /* ---- 倒计时开场 ---- */
+  /* ---- 倒计时开场遮罩 ---- */
   #cdOverlay {
     position: fixed; inset: 0; z-index: 90; display: none; flex-direction: column;
     align-items: center; justify-content: center; background: rgba(8,8,10,0.95);
@@ -80,16 +85,19 @@
   #setup {
     position: fixed; inset: 0; background: var(--void); display: flex;
     flex-direction: column; align-items: center; justify-content: center;
-    gap: 14px; z-index: 100; padding: 24px; text-align: center;
+    gap: 14px; z-index: 100; padding: 24px; text-align: center; overflow-y: auto;
   }
   #setup h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px 0; }
   #setup p.desc { color: var(--text-dim); font-size: 13px; margin: 0; max-width: 340px; }
   #setup input {
-    width: min(320px, 80vw); padding: 12px 14px; border-radius: 8px; border: 1px solid var(--hair);
-    background: #101013; color: var(--text-primary); font-size: 14px; text-align: center;
+    width: min(320px, 85vw); height: 42px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--hair);
+    background: #101013; color: var(--text-primary); font-size: 14px; text-align: center; box-sizing: border-box;
   }
   #setup input#roomInput { font-family: var(--mono); font-size: 18px; letter-spacing: 0.08em; text-transform: uppercase; }
-  #setup button.primary { padding: 12px 28px; border-radius: 8px; border: none; background: var(--cue); color: #05130B; font-weight: 700; font-size: 15px; cursor: pointer; }
+  #setup button.primary {
+    width: min(320px, 85vw); height: 44px; border-radius: 8px; border: none; background: var(--cue); color: #05130B; font-weight: 700; font-size: 15px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  }
   #errorTip { color: var(--live); font-size: 12.5px; margin-top: 4px; display: none; }
 
   /* ---- 设置抽屉 ---- */
@@ -97,11 +105,12 @@
     position: fixed; top: 0; right: 0; bottom: 0; width: min(300px, 85vw);
     background: #121317; border-left: 1px solid var(--hair); z-index: 95;
     transform: translateX(100%); transition: transform 0.25s ease; padding: 20px;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.5);
   }
   #drawer.open { transform: translateX(0); }
   #drawer h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin: 16px 0 10px 0; }
-  #drawer label { font-size: 12px; color: var(--text-dim); display: block; margin-bottom: 4px; }
-  #drawer input[type=range] { width: 100%; margin-bottom: 12px; }
+  #drawer label { font-size: 12px; color: var(--text-dim); display: flex; justify-content: space-between; margin-bottom: 6px; }
+  #drawer input[type=range] { width: 100%; margin-bottom: 14px; accent-color: var(--cue); cursor: pointer; }
   #closeDrawer { position: absolute; top: 14px; right: 14px; background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
 </style>
 </head>
@@ -118,7 +127,7 @@
   </div>
 
   <div id="statusbar">
-    <button id="gearBtn" style="background:transparent; border:none; color:var(--text-dim); font-size:16px; cursor:pointer;">⚙</button>
+    <button id="gearBtn" title="打开设置">⚙</button>
     <span class="tally" id="tally"></span>
     <span id="roomLabel">未连接</span>
     <select id="roleSelector">
@@ -145,13 +154,15 @@
 
   <div id="drawer">
     <button id="closeDrawer">✕</button>
-    <h3>本地独立字号与行距</h3>
-    <label>字号大小 (<span id="localFontVal">48</span>px)</label>
+    <h3 style="margin-top:0;">本地独立字号与行距</h3>
+    <label>字号大小 <span id="localFontVal" style="font-family:var(--mono); color:var(--cue);">48px</span></label>
     <input type="range" id="localFontSlider" min="28" max="96" step="2" value="48">
     <label>行间距</label>
     <input type="range" id="localLineSlider" min="1.2" max="2.2" step="0.05" value="1.55">
     <h3 style="margin-top:20px;">显示设置</h3>
-    <label><input type="checkbox" id="overrideFontCheck"> 强制跟随导播字号</label>
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+      <input type="checkbox" id="overrideFontCheck" style="accent-color:var(--cue);"> 强制跟随导播字号
+    </label>
   </div>
 
 <script>
@@ -159,7 +170,6 @@
   let state = { script: '', scrollRatio: 0, playing: false, speed: 1, mirrored: false, fontSize: 48, lineHeight: 1.55 };
   let currentRole = 'ALL';
   let localFontSize = parseInt(localStorage.getItem('anchor_font') || '48');
-  let animationFrameId = null;
 
   const setup = document.getElementById('setup');
   const roomInput = document.getElementById('roomInput');
@@ -174,7 +184,6 @@
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     serverInput.value = `${wsProto}//${location.host}`;
 
-    // 解析 URL 参数 ?room=XXX&pass=YYY
     const params = new URLSearchParams(location.search);
     if (params.get('room')) roomInput.value = params.get('room').toUpperCase();
     if (params.get('pass')) passInput.value = params.get('pass');
@@ -276,12 +285,11 @@
     }
   }
 
-  // 抽屉与字号控制
   document.getElementById('gearBtn').onclick = () => document.getElementById('drawer').classList.add('open');
   document.getElementById('closeDrawer').onclick = () => document.getElementById('drawer').classList.remove('open');
   document.getElementById('localFontSlider').oninput = (e) => {
     localFontSize = parseInt(e.target.value);
-    document.getElementById('localFontVal').textContent = localFontSize;
+    document.getElementById('localFontVal').textContent = `${localFontSize}px`;
     localStorage.setItem('anchor_font', localFontSize);
     renderScript();
   };
