@@ -53,7 +53,6 @@
     width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
   }
 
-  /* 提词画布与眼神聚焦模式 */
   #canvasFrame { position: fixed; inset: 0; cursor: grab; }
   #canvasFrame:active { cursor: grabbing; }
   #stage { position: absolute; inset: 0; display: flex; justify-content: center; }
@@ -78,7 +77,6 @@
 
   @keyframes flashBorder { 0%,100% { border-color: var(--live); } 50% { border-color: transparent; } }
 
-  /* 拼音与重音渲染 */
   ruby { ruby-position: over; }
   rt { font-size: 0.45em; color: var(--cue); font-weight: normal; font-family: var(--mono); }
   strong.emphasis { color: var(--amber); text-decoration: underline; text-underline-offset: 6px; }
@@ -115,14 +113,14 @@
     position: fixed; top: 56px; right: 16px; z-index: 999; display: flex; flex-direction: column; gap: 8px; pointer-events: none;
   }
   .toast {
-    background: rgba(20,21,25,0.92); border: 1px solid var(--hair); border-radius: 10px; padding: 10px 16px;
-    font-size: 12px; color: var(--text-primary); box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    display: flex; align-items: center; gap: 8px; backdrop-filter: blur(10px);
+    background: rgba(26,27,34,0.92); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 12px 18px;
+    font-size: 13px; color: var(--text-primary); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    display: flex; align-items: center; gap: 10px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: auto;
   }
   .toast.show { transform: translateX(0); }
-  .toast.warning { border-color: var(--amber); color: var(--amber); }
-  .toast.success { border-color: var(--cue); color: var(--cue); }
+  .toast.warning { border-color: rgba(232,162,61,0.5); background: rgba(35,28,18,0.95); color: var(--amber); }
+  .toast.success { border-color: rgba(61,220,132,0.5); background: rgba(18,35,25,0.95); color: var(--cue); }
 
   #drawer {
     position: fixed; top: 0; right: 0; bottom: 0; width: min(300px, 85vw);
@@ -184,7 +182,7 @@
   <select id="mirrorSelect">
     <option value="none">不镜像 (常规屏幕)</option>
     <option value="x">左右翻转 (常见硬件分光屏)</option>
-    <option value="y">上下翻转 (倒装倒挂反射屏)</option>
+    <option value="y">上下翻转 (倒挂反射屏)</option>
     <option value="xy">双向完全翻转</option>
   </select>
   <h3>眼神与出镜保护</h3>
@@ -201,6 +199,7 @@
 
 <script>
   let ws = null;
+  let hasConnectedOnce = false;
   let state = { script: '', scrollRatio: 0, playing: false, speed: 1, mirrored: false, fontSize: 48, lineHeight: 1.55, eyeContactGuard: true };
   let currentRole = 'ALL';
   let localFontSize = parseInt(localStorage.getItem('anchor_font') || '48');
@@ -229,11 +228,15 @@
   }
 
   window.addEventListener('offline', () => {
-    document.getElementById('tally').className = 'tally local';
-    showToast('⚠️ 网络已断开，自动切换为本地离线防灾模式', 'warning', 4500);
+    if (hasConnectedOnce) {
+      document.getElementById('tally').className = 'tally local';
+      showToast('⚠️ 网络已断开，已自动切换为本地离线模式', 'warning', 4500);
+    }
   });
   window.addEventListener('online', () => {
-    showToast('🌐 物理网络已恢复，正在恢复云端频道连接', 'info', 3000);
+    if (hasConnectedOnce) {
+      showToast('🌐 物理网络已恢复，正在恢复云端频道连接', 'info', 3000);
+    }
   });
 
   window.addEventListener('DOMContentLoaded', () => {
@@ -284,11 +287,15 @@
     if (!room) { showError('请填写房间码'); return; }
 
     const wsUrl = `${server}/room/${room}/ws?role=anchor&anchorRole=${currentRole}&pass=${encodeURIComponent(pass)}`;
-    if (ws) ws.close();
+    if (ws) {
+      ws.onclose = null;
+      ws.close();
+    }
 
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
+      hasConnectedOnce = true;
       setup.style.display = 'none';
       document.getElementById('tally').className = 'tally live';
       document.getElementById('roomLabel').textContent = `房间: ${room}`;
@@ -309,7 +316,9 @@
     ws.onerror = () => { showError('连接错误或密码无效'); };
     ws.onclose = (e) => {
       document.getElementById('tally').className = 'tally local';
-      showToast('⚠️ 网络断开，提词器维持本地流畅模式', 'warning', 4000);
+      if (hasConnectedOnce) {
+        showToast('⚠️ 网络已断开，提词器维持本地流畅模式', 'warning', 4000);
+      }
       if (setup.style.display !== 'none') showError(e.reason || '无法进入房间，请检查密码或房间码');
     };
   }
@@ -324,11 +333,8 @@
     renderScript();
   });
 
-  // 解析拼音注音与重音格式
   function parseScriptLine(line) {
-    // 替换 {字|zì} 为 ruby
     let html = line.replace(/\{([^|]+)\|([^}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>');
-    // 替换 *重音* 为 strong
     html = html.replace(/\*([^*]+)\*/g, '<strong class="emphasis">$1</strong>');
     return html;
   }
