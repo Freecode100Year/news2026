@@ -1,0 +1,15 @@
+{
+  "name": "新闻提词器 · 主播端",
+  "short_name": "主播提词",
+  "start_url": "/anchor.html",
+  "display": "standalone",
+  "background_color": "#08080A",
+  "theme_color": "#08080A",
+  "icons": [
+    {
+      "src": "/icon-anchor.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

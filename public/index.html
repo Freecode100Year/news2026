@@ -3,109 +3,83 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>新闻直播提词系统 · NewsPrompter 2.0</title>
+<title>新闻直播提词器 · 首页入口</title>
+<link rel="manifest" href="manifest-director.webmanifest">
+<link rel="apple-touch-icon" href="icon-director.svg">
+<meta name="theme-color" content="#1B1C20">
 <style>
   :root {
-    --bg: #0F1015; --panel: #1A1B22; --border: #2A2B35;
-    --text: #F5F5F0; --dim: #8B8C95; --cue: #3DDC84; --live: #FF4D5E; --amber: #E8A23D;
-    --mono: ui-monospace, "SF Mono", Consolas, monospace;
+    --bg: #111215; --panel: #1B1C20; --hair: #2C2D33;
+    --text-primary: #F5F5F0; --text-dim: #8B8C93; --cue: #3DDC84; --accent: #4FA8E8;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   }
   * { box-sizing: border-box; }
-  body {
-    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
-    font-family: var(--sans); display: flex; flex-direction: column;
-    align-items: center; justify-content: flex-start;
-  }
-
-  /* 顶部全宽通知与 GitHub 仓库公布栏 */
-  .top-bar {
-    width: 100%; background: #16171E; border-bottom: 1px solid var(--border);
-    padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
-    font-size: 13px; flex-wrap: wrap; gap: 10px;
-  }
-  .top-bar .brand { font-weight: 700; font-family: var(--mono); color: var(--cue); display: flex; align-items: center; gap: 6px; }
-  .github-banner-btn {
-    display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 5px 14px;
-    color: var(--text); text-decoration: none; font-size: 12.5px; font-weight: 500;
-    transition: all 0.2s ease;
-  }
-  .github-banner-btn:hover { background: var(--cue); color: #05130B; border-color: var(--cue); font-weight: 700; }
-  .github-icon { width: 16px; height: 16px; fill: currentColor; }
-
-  .content-wrap {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    flex: 1; padding: 40px 20px; width: 100%; max-width: 900px;
-  }
-  .hero { text-align: center; max-width: 640px; margin-bottom: 36px; }
-  .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; background: rgba(61,220,132,0.15); color: var(--cue); font-family: var(--mono); font-size: 12px; font-weight: 600; margin-bottom: 16px; border: 1px solid rgba(61,220,132,0.3); }
-  h1 { font-size: 28px; margin: 0 0 12px 0; font-weight: 800; letter-spacing: -0.02em; }
-  p.sub { color: var(--dim); font-size: 14px; margin: 0; line-height: 1.6; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--bg); color: var(--text-primary); font-family: var(--sans); }
   
-  .cards { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; width: 100%; }
-  a.card {
-    display: flex; flex-direction: column; flex: 1; min-width: 300px; padding: 28px; border-radius: 16px;
-    background: var(--panel); border: 1px solid var(--border); text-decoration: none; color: var(--text);
-    transition: all 0.25s ease;
+  header.top-banner {
+    background: var(--panel); border-bottom: 1px solid var(--hair); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
   }
-  a.card:hover { border-color: var(--cue); transform: translateY(-3px); box-shadow: 0 12px 24px rgba(0,0,0,0.3); }
-  a.card .dot { width: 10px; height: 10px; border-radius: 50%; margin-bottom: 16px; }
-  a.card.director .dot { background: var(--cue); box-shadow: 0 0 10px rgba(61,220,132,0.5); }
-  a.card.anchor .dot { background: var(--live); box-shadow: 0 0 10px rgba(255,77,94,0.5); }
-  a.card h2 { font-size: 18px; margin: 0 0 8px 0; font-weight: 700; display: flex; align-items: center; justify-content: space-between; }
-  a.card p { font-size: 13px; color: var(--dim); margin: 0; line-height: 1.6; }
-  .card-features { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; flex-wrap: wrap; gap: 8px; }
-  .feat-tag { font-size: 11px; font-family: var(--mono); background: rgba(255,255,255,0.05); padding: 3px 8px; border-radius: 6px; color: var(--dim); }
+  header.top-banner .logo { font-weight: 700; font-size: 16px; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+  header.top-banner a.github-link {
+    font-family: var(--mono); font-size: 13px; color: var(--cue); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid rgba(61,220,132,0.3); border-radius: 8px; background: rgba(61,220,132,0.08); transition: all 0.2s ease;
+  }
+  header.top-banner a.github-link:hover { background: rgba(61,220,132,0.18); border-color: var(--cue); }
 
-  footer { margin-top: 40px; font-family: var(--mono); font-size: 12px; color: var(--dim); text-align: center; }
+  main.hero { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: calc(100vh - 70px); padding: 24px; text-align: center; }
+  main.hero h1 { font-size: 36px; font-weight: 800; margin: 0 0 12px 0; letter-spacing: -0.02em; }
+  main.hero p.tagline { font-size: 16px; color: var(--text-dim); max-width: 580px; margin: 0 0 40px 0; line-height: 1.6; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; width: min(720px, 92vw); }
+  .card {
+    background: var(--panel); border: 1px solid var(--hair); border-radius: 16px; padding: 28px 24px; text-align: left; text-decoration: none; color: var(--text-primary); transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .card:hover { transform: translateY(-4px); border-color: var(--cue); box-shadow: 0 12px 32px rgba(0,0,0,0.5); }
+  .card .icon { font-size: 32px; margin-bottom: 12px; }
+  .card h2 { font-size: 18px; font-weight: 700; margin: 0 0 8px 0; }
+  .card p { font-size: 13px; color: var(--text-dim); margin: 0 0 20px 0; line-height: 1.5; }
+  .card .btn-text { font-family: var(--mono); font-size: 12.5px; font-weight: 700; color: var(--cue); display: flex; align-items: center; gap: 6px; }
 </style>
 </head>
 <body>
 
-  <!-- 页面最顶端高亮公布 GitHub 仓库 -->
-  <div class="top-bar">
-    <div class="brand">PROMPTER 2.0</div>
-    <a class="github-banner-btn" href="https://github.com/Freecode100Year/news2026" target="_blank" rel="noopener">
-      <svg class="github-icon" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
-      <span>开源仓库: https://github.com/Freecode100Year/news2026</span>
+<header class="top-banner">
+  <div class="logo">🎥 新闻直播提词器</div>
+  <a class="github-link" href="https://github.com/Freecode100Year/news2026" target="_blank">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+    GitHub 源码: Freecode100Year/news2026
+  </a>
+</header>
+
+<main class="hero">
+  <h1>广播级新闻直播提词系统</h1>
+  <p class="tagline">专为演播室高压直播场景定制。具备临场无感改稿、眼神收窄出镜保护、拼音注音、双向视线追踪与离线极速防灾支持。</p>
+
+  <div class="card-grid">
+    <a class="card" href="/director.html">
+      <div>
+        <div class="icon">🎛</div>
+        <h2>导播控制台</h2>
+        <p>创建频道、设置密码与有效期、临场无感改稿、倒计时联动、视线追踪与一键警示召回。</p>
+      </div>
+      <div class="btn-text">进入导播台 →</div>
+    </a>
+
+    <a class="card" href="/anchor.html">
+      <div>
+        <div class="icon">📺</div>
+        <h2>主播提词端</h2>
+        <p>支持拼音注音、重音高亮、硬件二维镜像、眼神视角收窄保护与 60FPS 毫秒级自动滚播。</p>
+      </div>
+      <div class="btn-text">进入提词端 →</div>
     </a>
   </div>
+</main>
 
-  <div class="content-wrap">
-    <div class="hero">
-      <div class="badge">新闻提词器一体化系统</div>
-      <h1>新闻直播双端提词系统</h1>
-      <p class="sub">云端/局域网双轨实时同步 · 导播多视角操控 · 多路主播同步滚动与独立字号 · 二维码一键安全入房</p>
-    </div>
-
-    <div class="cards">
-      <a class="card director" href="./director.html">
-        <div class="dot"></div>
-        <h2>导播控制台 <span>→</span></h2>
-        <p>导入/编排稿件、房间密码与有效期保护、双人对话标记、时间戳与开播倒计时联动、实时扫码邀请。</p>
-        <div class="card-features">
-          <span class="feat-tag">密码保护</span>
-          <span class="feat-tag">时间戳标记</span>
-          <span class="feat-tag">开播倒计时</span>
-          <span class="feat-tag">二维码邀请</span>
-        </div>
-      </a>
-
-      <a class="card anchor" href="./anchor.html">
-        <div class="dot"></div>
-        <h2>主播端显示 <span>→</span></h2>
-        <p>双人主持独立字号与角色高亮、硬件提词器反射屏适配、全屏滚动与断网无缝自愈运行。</p>
-        <div class="card-features">
-          <span class="feat-tag">双视角支持</span>
-          <span class="feat-tag">独立字号</span>
-          <span class="feat-tag">离线自愈</span>
-          <span class="feat-tag">镜像翻转</span>
-        </div>
-      </a>
-    </div>
-
-    <footer>新闻直播提词系统 &copy; 2026 · <a href="https://github.com/Freecode100Year/news2026" style="color:inherit;" target="_blank">GitHub Repository</a></footer>
-  </div>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+  }
+</script>
 </body>
 </html>

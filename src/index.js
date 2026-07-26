@@ -1,6 +1,9 @@
 /**
  * 新闻提词器一体化 Worker & Durable Object (PrompterRoom)
- * 修正房间码正则匹配，支持 1~32 位任意短房间码 (如 A1, 8, NEWS 等)
+ * 修复：
+ * 1. P0 - 增加对 director 'action' 消息的广播支持 (如 flashCue 一键警示召回)
+ * 2. P0 - 导播 command 更新状态时广播给房间所有人 (包括导播自己)，保证状态 100% 对齐
+ * 3. 修复短房间码匹配正则
  */
 
 export class PrompterRoom {
@@ -99,7 +102,11 @@ export class PrompterRoom {
 
     if (role === 'director' && msg.type === 'command') {
       this.updateStateFromDirector(msg.payload);
-      this.broadcast({ type: 'state', payload: this.lastState }, ws);
+      // P0 修复：向所有人（包含发送者导播自身）广播最新状态，保证导播 UI 按钮即时同步
+      this.broadcast({ type: 'state', payload: this.lastState });
+    } else if (role === 'director' && msg.type === 'action') {
+      // P0 修复：转发 action 消息（例如一键警示召回 flashCue）
+      this.broadcast({ type: 'action', payload: msg.payload });
     } else if (role === 'anchor' && msg.type === 'anchorProgress') {
       this.lastState.anchorProgress[anchorRole] = msg.payload;
       this.broadcast({ type: 'anchorProgress', payload: { role: anchorRole, progress: msg.payload } }, ws);
@@ -156,7 +163,6 @@ export class PrompterRoom {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    // 放宽房间码正则匹配，允许 1~32 位短房间码 (如 A1, 8 等)
     const match = url.pathname.match(/^\/room\/([A-Za-z0-9-]{1,32})\/ws$/);
 
     if (match) {

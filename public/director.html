@@ -111,6 +111,9 @@
   #timecodeReadout { font-family: var(--mono); font-size: 26px; text-align: center; letter-spacing: 0.05em; margin: 4px 0 2px 0; color: var(--text-primary); }
   #estimateReadout { text-align: center; font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-bottom: 12px; }
 
+  #liveCountdownBox { display: none; background: rgba(232,162,61,0.15); border: 1px solid var(--amber); border-radius: 8px; padding: 10px; text-align: center; margin-bottom: 14px; }
+  #liveCountdownBox .cd-val { font-family: var(--mono); font-size: 32px; font-weight: 700; color: var(--amber); }
+
   .eye-tracker-panel { background: rgba(79,168,232,0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; font-size: 11.5px; margin-top: 6px; font-family: var(--mono); display: flex; align-items: center; justify-content: space-between; }
 
   #toastContainer {
@@ -289,6 +292,7 @@
   };
   let timerInterval = null;
   let elapsedSec = 0;
+  let cdInterval = null;
   let pendingPushPayload = null;
 
   const roomInput = document.getElementById('roomInput');
@@ -319,6 +323,10 @@
     }, duration);
   }
 
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+  }
+
   window.addEventListener('offline', () => {
     if (hasConnectedOnce) {
       showToast('⚠️ 物理网络已断开，修改将自动暂存本地防灾缓存', 'warning', 4500);
@@ -342,7 +350,57 @@
       localStorage.setItem('director_draft_script', scriptInput.value);
     });
     updateScriptMeta();
+    bindControlEvents();
   });
+
+  // P1 修复：绑定速度 slider、字号 slider 和倒计时按钮事件
+  function bindControlEvents() {
+    document.getElementById('speedSlider').addEventListener('input', (e) => {
+      const speed = parseFloat(e.target.value);
+      document.getElementById('speedVal').textContent = `${speed}×`;
+      sendCmd({ speed: speed });
+    });
+
+    document.getElementById('fontSlider').addEventListener('input', (e) => {
+      const fontSize = parseInt(e.target.value);
+      document.getElementById('fontVal').textContent = `${fontSize}px`;
+      sendCmd({ fontSize: fontSize });
+    });
+
+    document.getElementById('startCdBtn').addEventListener('click', () => {
+      const sec = parseInt(document.getElementById('cdSelect').value);
+      const targetTime = Date.now() + sec * 1000;
+      sendCmd({ liveCountdown: targetTime });
+      showToast(`🔴 已设置倒计时 ${sec} 秒自动开播`, 'warning');
+    });
+
+    document.getElementById('cancelCdBtn').addEventListener('click', () => {
+      sendCmd({ liveCountdown: null });
+      showToast('已取消倒计时', 'info');
+    });
+
+    document.getElementById('uploadBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          scriptInput.value = evt.target.result;
+          updateScriptMeta();
+          localStorage.setItem('director_draft_script', scriptInput.value);
+          showToast('✓ 稿件加载成功', 'success');
+        };
+        reader.readAsText(file);
+      }
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      scriptInput.value = '';
+      updateScriptMeta();
+      localStorage.setItem('director_draft_script', '');
+      showToast('稿件已清空', 'info');
+    });
+  }
 
   function updateScriptMeta() {
     const text = scriptInput.value;
@@ -421,7 +479,7 @@
       }
     };
 
-    ws.onerror = (e) => {
+    ws.onerror = () => {
       showToast('⚠️ 房间握手失败，请检查密码或输入有效房间码', 'error');
     };
 
@@ -465,14 +523,37 @@
 
   function renderState() {
     playBtn.textContent = state.playing ? '⏸' : '▶';
-    document.getElementById('speedVal').textContent = `${state.speed}×`;
-    document.getElementById('speedSlider').value = state.speed;
-    document.getElementById('fontSlider').value = state.fontSize;
-    document.getElementById('fontVal').textContent = `${state.fontSize}px`;
+    document.getElementById('speedVal').textContent = `${state.speed || 1}×`;
+    document.getElementById('speedSlider').value = state.speed || 1;
+    document.getElementById('fontSlider').value = state.fontSize || 48;
+    document.getElementById('fontVal').textContent = `${state.fontSize || 48}px`;
     document.getElementById('eyeGuardToggle').className = state.eyeContactGuard ? 'switch on' : 'switch';
     document.getElementById('mirrorToggle').className = state.mirrored ? 'switch on' : 'switch';
     renderJumpPoints();
     toggleDirectorTimer(state.playing);
+    renderCountdownUI();
+  }
+
+  function renderCountdownUI() {
+    const cdBox = document.getElementById('liveCountdownBox');
+    if (cdInterval) { clearInterval(cdInterval); cdInterval = null; }
+
+    if (state.liveCountdown && state.liveCountdown > Date.now()) {
+      cdBox.style.display = 'block';
+      const updateCD = () => {
+        const remaining = Math.max(0, Math.ceil((state.liveCountdown - Date.now()) / 1000));
+        document.getElementById('cdVal').textContent = `00:${String(remaining).padStart(2, '0')}`;
+        if (remaining <= 0) {
+          cdBox.style.display = 'none';
+          if (cdInterval) clearInterval(cdInterval);
+          cdInterval = null;
+        }
+      };
+      updateCD();
+      cdInterval = setInterval(updateCD, 500);
+    } else {
+      cdBox.style.display = 'none';
+    }
   }
 
   function toggleDirectorTimer(playing) {
@@ -546,6 +627,24 @@
   playBtn.addEventListener('click', () => sendCmd({ playing: !state.playing }));
   document.getElementById('eyeGuardToggle').addEventListener('click', () => sendCmd({ eyeContactGuard: !state.eyeContactGuard }));
   document.getElementById('mirrorToggle').addEventListener('click', () => sendCmd({ mirrored: !state.mirrored }));
+
+  // 二维码与邀请链接绑定
+  document.getElementById('showQrBtn').addEventListener('click', () => {
+    const url = `${location.protocol}//${location.host}/anchor.html?room=${roomCode}&pass=${encodeURIComponent(roomPass)}`;
+    const qrContainer = document.getElementById('qrcode');
+    qrContainer.innerHTML = '';
+    if (window.QRCode) {
+      new QRCode(qrContainer, { text: url, width: 180, height: 180 });
+    } else {
+      qrContainer.textContent = url;
+    }
+    qrModal.classList.add('show');
+  });
+  document.getElementById('closeQrBtn').addEventListener('click', () => qrModal.classList.remove('show'));
+  document.getElementById('copyLinkBtn').addEventListener('click', () => {
+    const url = `${location.protocol}//${location.host}/anchor.html?room=${roomCode}&pass=${encodeURIComponent(roomPass)}`;
+    navigator.clipboard.writeText(url).then(() => showToast('📋 邀请链接已复制到剪贴板', 'success'));
+  });
 </script>
 </body>
 </html>

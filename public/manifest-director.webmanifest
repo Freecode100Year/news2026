@@ -1,0 +1,15 @@
+{
+  "name": "新闻提词器 · 导播控制台",
+  "short_name": "导播台",
+  "start_url": "/director.html",
+  "display": "standalone",
+  "background_color": "#1B1C20",
+  "theme_color": "#1B1C20",
+  "icons": [
+    {
+      "src": "/icon-director.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

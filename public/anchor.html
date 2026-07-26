@@ -200,14 +200,14 @@
 <script>
   let ws = null;
   let hasConnectedOnce = false;
-  let state = { script: '', scrollRatio: 0, playing: false, speed: 1, mirrored: false, fontSize: 48, lineHeight: 1.55, eyeContactGuard: true };
+  let state = { script: '', scrollRatio: 0, playing: false, speed: 1, mirrored: false, fontSize: 48, lineHeight: 1.55, eyeContactGuard: true, liveCountdown: null };
   let currentRole = 'ALL';
   let localFontSize = parseInt(localStorage.getItem('anchor_font') || '48');
   let lastReportedParaIdx = -1;
 
-  // 自动平滑滚动帧循环控制变量
   let animFrameId = null;
   let lastAnimTime = 0;
+  let cdInterval = null;
 
   const setup = document.getElementById('setup');
   const roomInput = document.getElementById('roomInput');
@@ -229,6 +229,11 @@
       toast.classList.remove('show');
       setTimeout(() => toast.remove(), 300);
     }, duration);
+  }
+
+  // P1 修复：注册 Service Worker 支持 PWA 离线运行
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
   }
 
   window.addEventListener('offline', () => {
@@ -261,7 +266,6 @@
 
     if (params.get('room')) connectRoom();
     
-    // 监听滚轮与按键手动跟播
     window.addEventListener('wheel', (e) => {
       const delta = e.deltaY > 0 ? 0.02 : -0.02;
       state.scrollRatio = Math.max(0, Math.min(1, state.scrollRatio + delta));
@@ -270,7 +274,9 @@
 
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
-        togglePlayState(!state.playing);
+        state.playing = !state.playing;
+        showToast(state.playing ? '▶ 启动自动滚动' : '⏸ 暂停滚动', 'info', 1500);
+        if (state.playing) startScrollLoop(); else stopScrollLoop();
       } else if (e.code === 'ArrowUp') {
         state.scrollRatio = Math.max(0, state.scrollRatio - 0.03);
         updateScrollPosition();
@@ -281,17 +287,6 @@
     });
   });
 
-  function togglePlayState(playing) {
-    state.playing = playing;
-    showToast(state.playing ? '▶ 启动自动滚动' : '⏸ 暂停滚动', 'info', 1500);
-    if (state.playing) {
-      startScrollLoop();
-    } else {
-      stopScrollLoop();
-    }
-  }
-
-  // 核心：基于 requestAnimationFrame 的毫秒级平滑自动跟播循环引擎
   function startScrollLoop() {
     stopScrollLoop();
     lastAnimTime = performance.now();
@@ -303,7 +298,6 @@
 
       const totalHeight = trackEl.scrollHeight - window.innerHeight;
       if (totalHeight > 0) {
-        // 基准播报速率 (px/s)，结合导播 speed 系数
         const speedPxPerSec = 42 * (state.speed || 1);
         const deltaRatio = (speedPxPerSec * dt) / totalHeight;
         state.scrollRatio = Math.min(1, state.scrollRatio + deltaRatio);
@@ -355,19 +349,18 @@
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'state') {
-        const wasPlaying = state.playing;
         state = { ...state, ...msg.payload };
         localStorage.setItem('anchor_cached_state', JSON.stringify(state));
         renderScript();
 
-        // 联动开启或取消自动滚动
         if (state.playing) {
           startScrollLoop();
         } else {
           stopScrollLoop();
         }
       } else if (msg.type === 'action' && msg.payload === 'flashCue') {
-        showToast('⚠️ 导播提示：请注意最新稿件调整！', 'warning', 4500);
+        // P0 修复：成功接收到导播一键召回警示
+        showToast('⚠️ 导播提示：请注意最新稿件调整！', 'warning', 5000);
       }
     };
 
@@ -391,10 +384,21 @@
     renderScript();
   });
 
+  // P1 修复 XSS 漏洞：对文本安全转义后再拼接 HTML 标签
+  function escapeHTML(str) {
+    return (str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   function parseScriptLine(line) {
-    let html = line.replace(/\{([^|]+)\|([^}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>');
-    html = html.replace(/\*([^*]+)\*/g, '<strong class="emphasis">$1</strong>');
-    return html;
+    let safe = escapeHTML(line);
+    safe = safe.replace(/\{([^|]+)\|([^}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>');
+    safe = safe.replace(/\*([^*]+)\*/g, '<strong class="emphasis">$1</strong>');
+    return safe;
   }
 
   function renderScript() {
@@ -468,12 +472,29 @@
     }
   }
 
+  // P1 修复：倒计时以定时器持续逐秒刷新并自动触发开播
   function checkCountdown() {
     const cdOverlay = document.getElementById('cdOverlay');
-    if (state.liveCountdown) {
+    if (cdInterval) {
+      clearInterval(cdInterval);
+      cdInterval = null;
+    }
+
+    if (state.liveCountdown && state.liveCountdown > Date.now()) {
       cdOverlay.style.display = 'flex';
-      const sec = Math.ceil((state.liveCountdown - Date.now()) / 1000);
-      document.getElementById('cdNum').textContent = Math.max(0, sec);
+      const updateCD = () => {
+        const remaining = Math.max(0, Math.ceil((state.liveCountdown - Date.now()) / 1000));
+        document.getElementById('cdNum').textContent = remaining;
+        if (remaining <= 0) {
+          cdOverlay.style.display = 'none';
+          if (cdInterval) clearInterval(cdInterval);
+          cdInterval = null;
+          state.playing = true;
+          startScrollLoop();
+        }
+      };
+      updateCD();
+      cdInterval = setInterval(updateCD, 500);
     } else {
       cdOverlay.style.display = 'none';
     }
