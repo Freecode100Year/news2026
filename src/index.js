@@ -1,6 +1,6 @@
 /**
  * 新闻提词器一体化 Worker & Durable Object (PrompterRoom)
- * 接入 Durable Object SQLite/Key-Value 存储，实现断网与重启零数据丢失
+ * 支持直播高压场景：无感增量改稿、双向视线游标反向推送与强容灾持久化
  */
 
 export class PrompterRoom {
@@ -19,13 +19,14 @@ export class PrompterRoom {
       mirrored: false,
       fontSize: 48,
       lineHeight: 1.55,
+      eyeContactGuard: true, // 默认开启自然出镜眼神收窄
       liveCountdown: null,
+      anchorProgress: {}, // 记录主播 A/B 的实时阅读段落位置 Map
       hasPassword: false,
       expiresAt: null,
       updatedAt: Date.now(),
     };
 
-    // 从 DO 持久化存储中加载上次存储的房间数据
     this.state.blockConcurrencyWhile(async () => {
       const saved = await this.state.storage.get('roomState');
       if (saved) {
@@ -82,7 +83,7 @@ export class PrompterRoom {
     ws.send(JSON.stringify({ type: 'state', payload: this.lastState }));
     this.broadcastPresence();
 
-    ws.addEventListener('message', (e) => this.onMessage(ws, role, e.data));
+    ws.addEventListener('message', (e) => this.onMessage(ws, role, anchorRole, e.data));
 
     const cleanup = () => {
       this.sessions.delete(ws);
@@ -92,27 +93,26 @@ export class PrompterRoom {
     ws.addEventListener('error', cleanup);
   }
 
-  onMessage(ws, role, data) {
+  onMessage(ws, role, anchorRole, data) {
     let msg;
     try { msg = JSON.parse(data); } catch (e) { return; }
 
     if (role === 'director' && msg.type === 'command') {
       this.updateStateFromDirector(msg.payload);
       this.broadcast({ type: 'state', payload: this.lastState }, ws);
-    } else if (msg.type === 'action') {
-      this.broadcast({ type: 'action', payload: msg.payload }, ws);
+    } else if (role === 'anchor' && msg.type === 'anchorProgress') {
+      // 主播反向汇报实时阅读进度 (双向游标)
+      this.lastState.anchorProgress[anchorRole] = msg.payload;
+      this.broadcast({ type: 'anchorProgress', payload: { role: anchorRole, progress: msg.payload } }, ws);
     } else if (msg.type === 'ping') {
       ws.send(JSON.stringify({ type: 'pong', t: msg.t }));
     }
   }
 
   updateStateFromDirector(payload) {
-    if (payload.password !== undefined) {
-      this.password = payload.password;
-    }
-    if (payload.expiresAt !== undefined) {
-      this.expiresAt = payload.expiresAt;
-    }
+    if (payload.password !== undefined) this.password = payload.password;
+    if (payload.expiresAt !== undefined) this.expiresAt = payload.expiresAt;
+
     this.lastState = {
       ...this.lastState,
       ...payload,
@@ -121,7 +121,6 @@ export class PrompterRoom {
       updatedAt: Date.now(),
     };
 
-    // 写入 Durable Object 持久化 SQLite / KeyValue 数据库，防止断网与实例重启掉数据
     this.state.storage.put('roomState', {
       ...this.lastState,
       password: this.password,

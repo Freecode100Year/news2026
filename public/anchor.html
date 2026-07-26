@@ -13,7 +13,7 @@
   :root {
     --void: #08080A;
     --text-primary: #F5F5F0;
-    --text-dim: #6B6C72;
+    --text-dim: #5B5C62;
     --hair: #26272C;
     --live: #FF4D5E;
     --cue: #3DDC84;
@@ -27,7 +27,7 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%; background: var(--void); overflow: hidden;
-    font-family: var(--sans); color: var(--text-primary);
+    font-family: var(--sans); color: var(--text-primary); user-select: none;
   }
 
   #statusbar {
@@ -52,23 +52,29 @@
     background: transparent; border: 1px solid var(--hair); color: var(--text-dim); border-radius: 6px;
     width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
   }
-  #gearBtn:hover { border-color: var(--cue); color: var(--cue); }
 
-  #canvasFrame { position: fixed; inset: 0; }
+  /* 提词画布与眼神聚焦模式 */
+  #canvasFrame { position: fixed; inset: 0; cursor: grab; }
+  #canvasFrame:active { cursor: grabbing; }
   #stage { position: absolute; inset: 0; display: flex; justify-content: center; }
-  #track { width: min(900px, 92vw); padding-top: 50vh; padding-bottom: 50vh; will-change: transform; }
+  
+  /* 眼神专注模式：宽度限制在 46% 镜头中央，瞳孔无摆动 */
+  #track { width: min(860px, 92vw); padding-top: 50vh; padding-bottom: 50vh; will-change: transform; transition: width 0.3s ease; }
+  #track.eye-guard { width: min(480px, 68vw) !important; text-align: center; }
+
   #script {
     font-size: 48px; line-height: 1.55; font-weight: 600;
     white-space: pre-wrap; word-break: break-word; transition: font-size 0.2s;
   }
   #script.mirrored { transform: scaleX(-1); }
 
-  .para { margin: 0 0 1.2em 0; transition: opacity 0.3s, transform 0.3s; }
+  .para { margin: 0 0 1.2em 0; transition: opacity 0.3s, transform 0.3s; opacity: 0.35; filter: blur(0.3px); }
+  .para.focus-active { opacity: 1 !important; filter: none !important; font-weight: 700; }
   .para.role-a { border-left: 4px solid var(--anchor-a); padding-left: 12px; }
   .para.role-b { border-left: 4px solid var(--anchor-b); padding-left: 12px; }
-  .para.dimmed { opacity: 0.25; filter: blur(0.5px); }
+  .para.dimmed { opacity: 0.15 !important; }
 
-  #focusline { position: fixed; left: 0; right: 0; top: 50%; height: 1px; background: rgba(255,255,255,0.1); z-index: 5; pointer-events: none; }
+  #focusline { position: fixed; left: 0; right: 0; top: 50%; height: 2px; background: linear-gradient(to right, transparent, rgba(61,220,132,0.3), transparent); z-index: 5; pointer-events: none; }
 
   #cdOverlay {
     position: fixed; inset: 0; z-index: 90; display: none; flex-direction: column;
@@ -96,7 +102,6 @@
   }
   #errorTip { color: var(--live); font-size: 12.5px; margin-top: 4px; display: none; }
 
-  /* Toast 消息气泡 */
   #toastContainer {
     position: fixed; top: 56px; right: 16px; z-index: 999; display: flex; flex-direction: column; gap: 8px; pointer-events: none;
   }
@@ -153,7 +158,7 @@
 <div id="canvasFrame">
   <div id="stage">
     <div id="track">
-      <div id="script"><div class="para">等待导播推送稿件...</div></div>
+      <div id="script"><div class="para focus-active">等待导播推送稿件...</div></div>
     </div>
   </div>
 </div>
@@ -165,22 +170,24 @@
 
 <div id="drawer">
   <button id="closeDrawer">✕</button>
-  <h3 style="margin-top:0;">本地独立字号与行距</h3>
+  <h3 style="margin-top:0;">眼神与出镜保护</h3>
+  <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+    <span>自然出镜 (文本收窄视角)</span>
+    <input type="checkbox" id="eyeGuardCheck" checked style="accent-color:var(--cue);">
+  </label>
+  <h3 style="margin-top:20px;">本地独立字号与行距</h3>
   <label>字号大小 <span id="localFontVal" style="font-family:var(--mono); color:var(--cue);">48px</span></label>
   <input type="range" id="localFontSlider" min="28" max="96" step="2" value="48">
   <label>行间距</label>
   <input type="range" id="localLineSlider" min="1.2" max="2.2" step="0.05" value="1.55">
-  <h3 style="margin-top:20px;">显示设置</h3>
-  <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-    <input type="checkbox" id="overrideFontCheck" style="accent-color:var(--cue);"> 强制跟随导播字号
-  </label>
 </div>
 
 <script>
   let ws = null;
-  let state = { script: '', scrollRatio: 0, playing: false, speed: 1, mirrored: false, fontSize: 48, lineHeight: 1.55 };
+  let state = { script: '', scrollRatio: 0, playing: false, speed: 1, mirrored: false, fontSize: 48, lineHeight: 1.55, eyeContactGuard: true };
   let currentRole = 'ALL';
   let localFontSize = parseInt(localStorage.getItem('anchor_font') || '48');
+  let lastReportedParaIdx = -1;
 
   const setup = document.getElementById('setup');
   const roomInput = document.getElementById('roomInput');
@@ -216,7 +223,6 @@
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     serverInput.value = `${wsProto}//${location.host}`;
 
-    // 优先读取本地持久化离线缓存
     const cachedState = localStorage.getItem('anchor_cached_state');
     if (cachedState) {
       try {
@@ -230,6 +236,20 @@
     if (params.get('pass')) passInput.value = params.get('pass');
 
     if (params.get('room')) connectRoom();
+    
+    // 监听鼠标滚轮与键盘按键，方便主播跟播微调
+    window.addEventListener('wheel', (e) => {
+      const delta = e.deltaY > 0 ? 0.02 : -0.02;
+      state.scrollRatio = Math.max(0, Math.min(1, state.scrollRatio + delta));
+      updateScrollPosition();
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        state.playing = !state.playing;
+        showToast(state.playing ? '▶ 启动滚动' : '⏸ 暂停滚动', 'info', 1500);
+      }
+    });
   });
 
   document.getElementById('connectBtn').addEventListener('click', connectRoom);
@@ -257,7 +277,6 @@
       const msg = JSON.parse(e.data);
       if (msg.type === 'state') {
         state = { ...state, ...msg.payload };
-        // 实时写入本地强缓存，保障断网零数据丢失
         localStorage.setItem('anchor_cached_state', JSON.stringify(state));
         renderScript();
       }
@@ -266,7 +285,7 @@
     ws.onerror = () => { showError('连接错误或密码无效'); };
     ws.onclose = (e) => {
       document.getElementById('tally').className = 'tally local';
-      showToast('⚠️ 网络已断开，提词器维持本地模式滚动', 'warning', 4000);
+      showToast('⚠️ 网络断开，提词器维持本地流畅模式', 'warning', 4000);
       if (setup.style.display !== 'none') showError(e.reason || '无法进入房间，请检查密码或房间码');
     };
   }
@@ -283,17 +302,19 @@
 
   function renderScript() {
     scriptEl.className = state.mirrored ? 'mirrored' : '';
-    const followDirector = document.getElementById('overrideFontCheck').checked;
-    const finalSize = followDirector ? state.fontSize : localFontSize;
-    scriptEl.style.fontSize = `${finalSize}px`;
+    scriptEl.style.fontSize = `${localFontSize}px`;
     scriptEl.style.lineHeight = state.lineHeight;
+
+    const useEyeGuard = document.getElementById('eyeGuardCheck').checked && state.eyeContactGuard;
+    trackEl.className = useEyeGuard ? 'eye-guard' : '';
 
     const lines = (state.script || '').split('\n');
     scriptEl.innerHTML = '';
 
-    lines.forEach(line => {
+    lines.forEach((line, idx) => {
       const p = document.createElement('div');
       p.className = 'para';
+      p.dataset.idx = idx;
 
       if (line.includes('[主播A]') || line.startsWith('A:')) {
         p.classList.add('role-a');
@@ -316,6 +337,34 @@
     if (totalHeight > 0) {
       const targetTop = state.scrollRatio * totalHeight;
       trackEl.style.transform = `translateY(-${targetTop}px)`;
+      updateFocusHighlight(targetTop);
+    }
+  }
+
+  // 计算焦点线位置并反向向导播反馈视线游标
+  function updateFocusHighlight(currentTop) {
+    const centerY = window.innerHeight * 0.5 + currentTop;
+    const paras = Array.from(scriptEl.querySelectorAll('.para'));
+    let currentFocusIdx = 0;
+
+    paras.forEach((p, idx) => {
+      const top = p.offsetTop;
+      const height = p.offsetHeight;
+      if (centerY >= top && centerY <= top + height + 20) {
+        p.classList.add('focus-active');
+        currentFocusIdx = idx;
+      } else {
+        p.classList.remove('focus-active');
+      }
+    });
+
+    // 反向给导播端汇报当前所读段落
+    if (currentFocusIdx !== lastReportedParaIdx && ws && ws.readyState === WebSocket.OPEN) {
+      lastReportedParaIdx = currentFocusIdx;
+      ws.send(JSON.stringify({
+        type: 'anchorProgress',
+        payload: { paraIdx: currentFocusIdx, ratio: state.scrollRatio }
+      }));
     }
   }
 
@@ -332,6 +381,7 @@
 
   document.getElementById('gearBtn').onclick = () => document.getElementById('drawer').classList.add('open');
   document.getElementById('closeDrawer').onclick = () => document.getElementById('drawer').classList.remove('open');
+  document.getElementById('eyeGuardCheck').onchange = renderScript;
   document.getElementById('localFontSlider').oninput = (e) => {
     localFontSize = parseInt(e.target.value);
     document.getElementById('localFontVal').textContent = `${localFontSize}px`;

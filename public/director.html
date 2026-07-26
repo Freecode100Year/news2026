@@ -81,6 +81,7 @@
   }
   button:hover { border-color: var(--cue); }
   button.primary { background: var(--cue); color: #05130B; border: none; font-weight: 700; }
+  button.amber { background: var(--amber); color: #1C1204; border: none; font-weight: 700; }
   button.danger { background: var(--live); color: #FFF; border: none; font-weight: 700; }
   button.ghost { background: transparent; color: var(--text-dim); font-size: 12px; }
   button:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -109,12 +110,9 @@
   #timecodeReadout { font-family: var(--mono); font-size: 26px; text-align: center; letter-spacing: 0.05em; margin: 4px 0 2px 0; color: var(--text-primary); }
   #estimateReadout { text-align: center; font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-bottom: 12px; }
 
-  #liveCountdownBox {
-    background: rgba(232,162,61,0.1); border: 1px solid var(--amber); border-radius: 10px; padding: 10px; text-align: center; margin-bottom: 12px; display: none;
-  }
-  #liveCountdownBox .cd-val { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--amber); }
+  /* 视线反向反馈区 */
+  .eye-tracker-panel { background: rgba(79,168,232,0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; font-size: 11.5px; margin-top: 6px; font-family: var(--mono); display: flex; align-items: center; justify-content: space-between; }
 
-  /* 消息气泡 Toast 容器 */
   #toastContainer {
     position: fixed; top: 16px; right: 16px; z-index: 999; display: flex; flex-direction: column; gap: 8px; pointer-events: none;
   }
@@ -127,7 +125,6 @@
   .toast.show { transform: translateX(0); }
   .toast.warning { border-color: var(--amber); color: var(--amber); }
   .toast.success { border-color: var(--cue); color: var(--cue); }
-  .toast.error { border-color: var(--live); color: var(--live); }
 
   .qr-modal {
     position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 200;
@@ -141,7 +138,6 @@
 </head>
 <body>
 
-<!-- Toast 气泡系统 -->
 <div id="toastContainer"></div>
 
 <header>
@@ -171,7 +167,7 @@
 <main>
   <section class="editor-section">
     <div class="editor-header">
-      <label class="field-label" for="scriptInput" style="margin:0;">稿件编辑 (支持离线实时草稿暂存防丢)</label>
+      <label class="field-label" for="scriptInput" style="margin:0;">稿件编辑 (支持临场无感改稿与多主播双向跟播)</label>
       <div class="editor-tools">
         <button class="tag-btn" onclick="insertTag('[主播A]')">➕ 主播A</button>
         <button class="tag-btn" onclick="insertTag('[主播B]')">➕ 主播B</button>
@@ -189,15 +185,22 @@
     </div>
 
     <div class="row">
-      <div class="btn-group"><button class="primary" id="pushBtn">推送到主播端</button><span class="btn-cap">更新稿件并重置滚动</span></div>
+      <div class="btn-group"><button class="primary" id="pushBtn">全新覆盖推送</button><span class="btn-cap">重置并从头播报</span></div>
+      <div class="btn-group"><button class="amber" id="hotPatchBtn">⚡ 临场无感改稿推送</button><span class="btn-cap">保持当前镜头不跳变</span></div>
       <div class="btn-group"><button id="uploadBtn">📁 导入 .txt</button><span class="btn-cap">选择本地文件</span></div>
       <input type="file" id="fileInput" accept=".txt">
-      <div class="btn-group"><button id="clearBtn">清空</button><span class="btn-cap">清空编辑文本</span></div>
+      <div class="btn-group"><button id="clearBtn">清空</button><span class="btn-cap">清空编辑框</span></div>
+    </div>
+
+    <!-- 主播双向视线跟播感知 -->
+    <div class="eye-tracker-panel" id="eyeTrackerPanel">
+      <span>👁 主播实时视线位置:</span>
+      <span id="eyeTrackerDetail" style="color:var(--accent);">等待主播读稿...</span>
     </div>
 
     <div class="panel-block" style="margin-top:16px;">
-      <h2>段落及时间戳跳转</h2>
-      <p class="desc">稿件分段锚点，点击可直接跳到指定台词段落</p>
+      <h2>段落及时间戳跳转 (带视线高亮)</h2>
+      <p class="desc">点击可跳到指定段落，主播正在阅读的段落会动态高亮</p>
       <div class="row" id="paraJumpRow"><span class="field-cap">推送稿件后在此自动生成跳转列表。</span></div>
     </div>
 
@@ -242,7 +245,7 @@
     </div>
 
     <div class="panel-block">
-      <h2>滚动与显示参数</h2>
+      <h2>眼神视角与显示参数</h2>
       <div class="slider-row">
         <label class="field-label">滚动速度 <span class="val" id="speedVal">1.0×</span></label>
         <input type="range" id="speedSlider" min="0.2" max="3" step="0.1" value="1">
@@ -250,6 +253,10 @@
       <div class="slider-row">
         <label class="field-label">参考字号 <span class="val" id="fontVal">48px</span></label>
         <input type="range" id="fontSlider" min="28" max="96" step="2" value="48">
+      </div>
+      <div class="toggle-row">
+        <span>自然出镜 (眼神收窄保护)</span>
+        <div class="switch on" id="eyeGuardToggle"></div>
       </div>
       <div class="toggle-row">
         <span>镜像模式 (提词器反射屏)</span>
@@ -274,7 +281,7 @@
   let roomPass = '';
   let state = {
     script: '', scrollRatio: 0, playing: false, speed: 1, mirrored: false, fontSize: 48, lineHeight: 1.55,
-    liveCountdown: null
+    eyeContactGuard: true, liveCountdown: null, anchorProgress: {}
   };
   let countdownTimer = null;
   let pendingPushPayload = null;
@@ -285,6 +292,7 @@
   const scriptInput = document.getElementById('scriptInput');
   const connectBtn = document.getElementById('connectBtn');
   const pushBtn = document.getElementById('pushBtn');
+  const hotPatchBtn = document.getElementById('hotPatchBtn');
   const playBtn = document.getElementById('playBtn');
   const connDot = document.getElementById('connDot');
   const roomText = document.getElementById('roomText');
@@ -292,7 +300,6 @@
   const anchorText = document.getElementById('anchorText');
   const qrModal = document.getElementById('qrModal');
 
-  // Toast 消息气泡封装
   function showToast(msg, type = 'info', duration = 3500) {
     const container = document.getElementById('toastContainer');
     const toast = document.createElement('div');
@@ -306,19 +313,10 @@
     }, duration);
   }
 
-  // 监听浏览器断网与重连事件
-  window.addEventListener('offline', () => {
-    showToast('⚠️ 物理网络已断开，已自动开启本地草稿防灾缓存', 'warning', 4500);
-  });
-  window.addEventListener('online', () => {
-    showToast('🌐 物理网络已恢复，正在尝试重新建立房间通道', 'info', 3000);
-  });
-
   window.addEventListener('DOMContentLoaded', () => {
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     serverInput.value = `${wsProto}//${location.host}`;
     
-    // 从 LocalStorage 恢复离线草稿
     const cachedDraft = localStorage.getItem('director_draft_script');
     if (cachedDraft) scriptInput.value = cachedDraft;
 
@@ -377,11 +375,10 @@
 
       sendCmd({ password: roomPass, expiresAt: expiresAt });
 
-      // 如果断网期间有离线推送指令，连通后补发
       if (pendingPushPayload) {
         sendCmd(pendingPushPayload);
         pendingPushPayload = null;
-        showToast('🔄 离线草稿已自动补发同步至主播端', 'success');
+        showToast('🔄 离线修改已自动补发同步', 'success');
       }
     };
 
@@ -393,6 +390,10 @@
       } else if (msg.type === 'presence') {
         anchorDot.className = msg.payload.anchorOnline ? 'dot on' : 'dot off';
         anchorText.textContent = `主播端 (${msg.payload.anchorCount})`;
+      } else if (msg.type === 'anchorProgress') {
+        // 接收主播视线阅读位置反向数据
+        state.anchorProgress[msg.payload.role] = msg.payload.progress;
+        updateEyeTrackerUI();
       }
     };
 
@@ -400,8 +401,20 @@
       connDot.className = 'dot off';
       roomText.textContent = '断开 (离线)';
       document.getElementById('showQrBtn').disabled = true;
-      showToast('⚠️ 通道已断开，操作将暂存本地缓存', 'warning', 4000);
+      showToast('⚠️ 通道已断开，修改将自动暂存本地', 'warning');
     };
+  }
+
+  function updateEyeTrackerUI() {
+    const detail = document.getElementById('eyeTrackerDetail');
+    const entries = Object.entries(state.anchorProgress);
+    if (entries.length === 0) {
+      detail.textContent = '主播尚未开始读稿';
+      return;
+    }
+    const info = entries.map(([role, prog]) => `主播${role}: 第 ${prog.paraIdx + 1} 段 (${Math.round(prog.ratio * 100)}%)`).join(' | ');
+    detail.textContent = info;
+    renderJumpPoints();
   }
 
   function sendCmd(payload) {
@@ -409,7 +422,7 @@
       ws.send(JSON.stringify({ type: 'command', payload: payload }));
     } else {
       pendingPushPayload = payload;
-      showToast('⚠️ 当前处于离线状态，修改已暂存本地，重连后自动发送', 'warning');
+      showToast('⚠️ 当前处于离线状态，修改已暂存本地', 'warning');
     }
   }
 
@@ -419,9 +432,9 @@
     document.getElementById('speedSlider').value = state.speed;
     document.getElementById('fontSlider').value = state.fontSize;
     document.getElementById('fontVal').textContent = `${state.fontSize}px`;
+    document.getElementById('eyeGuardToggle').className = state.eyeContactGuard ? 'switch on' : 'switch';
     document.getElementById('mirrorToggle').className = state.mirrored ? 'switch on' : 'switch';
     renderJumpPoints();
-    checkLiveCountdown();
   }
 
   function renderJumpPoints() {
@@ -429,10 +442,25 @@
     wrap.innerHTML = '';
     const text = state.script || '';
     const lines = text.split('\n').filter(l => l.trim().length > 0);
+
     lines.forEach((line, idx) => {
       const btn = document.createElement('button');
       btn.className = 'tag-btn';
-      btn.textContent = line.length > 15 ? line.substring(0, 15) + '...' : line;
+      
+      // 判断是否有主播正在读此段
+      let isAnchorReading = false;
+      Object.values(state.anchorProgress).forEach(prog => {
+        if (prog && prog.paraIdx === idx) isAnchorReading = true;
+      });
+
+      if (isAnchorReading) {
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.color = 'var(--accent)';
+        btn.textContent = `👁 ${line.length > 12 ? line.substring(0, 12) + '...' : line}`;
+      } else {
+        btn.textContent = line.length > 15 ? line.substring(0, 15) + '...' : line;
+      }
+
       btn.onclick = () => {
         const ratio = idx / Math.max(1, lines.length - 1);
         sendCmd({ scrollRatio: ratio });
@@ -441,71 +469,15 @@
     });
   }
 
-  document.getElementById('startCdBtn').addEventListener('click', () => {
-    const sec = parseInt(document.getElementById('cdSelect').value);
-    const target = Date.now() + sec * 1000;
-    sendCmd({ liveCountdown: target, playing: false });
-  });
-
-  document.getElementById('cancelCdBtn').addEventListener('click', () => {
-    sendCmd({ liveCountdown: null });
-  });
-
-  function checkLiveCountdown() {
-    const box = document.getElementById('liveCountdownBox');
-    if (!state.liveCountdown) {
-      box.style.display = 'none';
-      if (countdownTimer) clearInterval(countdownTimer);
-      return;
-    }
-
-    box.style.display = 'block';
-    if (countdownTimer) clearInterval(countdownTimer);
-    
-    countdownTimer = setInterval(() => {
-      const remain = Math.ceil((state.liveCountdown - Date.now()) / 1000);
-      if (remain <= 0) {
-        clearInterval(countdownTimer);
-        document.getElementById('cdVal').textContent = '00:00 - 开播！';
-        sendCmd({ liveCountdown: null, playing: true, scrollRatio: 0 });
-      } else {
-        const m = String(Math.floor(remain / 60)).padStart(2, '0');
-        const s = String(remain % 60).padStart(2, '0');
-        document.getElementById('cdVal').textContent = `${m}:${s}`;
-      }
-    }, 200);
-  }
-
-  function getInviteUrl() {
-    const host = location.origin;
-    let url = `${host}/anchor.html?room=${roomCode}`;
-    if (roomPass) url += `&pass=${encodeURIComponent(roomPass)}`;
-    return url;
-  }
-
-  document.getElementById('showQrBtn').addEventListener('click', () => {
-    const url = getInviteUrl();
-    const qrDiv = document.getElementById('qrcode');
-    qrDiv.innerHTML = '';
-    new QRCode(qrDiv, { text: url, width: 180, height: 180 });
-    qrModal.className = 'qr-modal show';
-  });
-
-  document.getElementById('closeQrBtn').addEventListener('click', () => {
-    qrModal.className = 'qr-modal';
-  });
-
-  document.getElementById('copyLinkBtn').addEventListener('click', () => {
-    navigator.clipboard.writeText(getInviteUrl());
-    showToast('📋 邀请链接已复制到剪贴板', 'success');
+  // 临场无感改稿：保持当前播放和位置不变，只增量更新文本
+  hotPatchBtn.addEventListener('click', () => {
+    sendCmd({ script: scriptInput.value });
+    showToast('⚡ 临场无感改稿已推送，镜头不跳变！', 'success');
   });
 
   pushBtn.addEventListener('click', () => sendCmd({ script: scriptInput.value, scrollRatio: 0, playing: true }));
   playBtn.addEventListener('click', () => sendCmd({ playing: !state.playing }));
-  document.getElementById('rewindBtn').addEventListener('click', () => sendCmd({ scrollRatio: 0 }));
-  document.getElementById('restartBtn').addEventListener('click', () => sendCmd({ scrollRatio: 0, playing: true }));
-  document.getElementById('speedSlider').addEventListener('input', (e) => sendCmd({ speed: parseFloat(e.target.value) }));
-  document.getElementById('fontSlider').addEventListener('input', (e) => sendCmd({ fontSize: parseInt(e.target.value) }));
+  document.getElementById('eyeGuardToggle').addEventListener('click', () => sendCmd({ eyeContactGuard: !state.eyeContactGuard }));
   document.getElementById('mirrorToggle').addEventListener('click', () => sendCmd({ mirrored: !state.mirrored }));
 </script>
 </body>
