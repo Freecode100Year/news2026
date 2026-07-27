@@ -90,6 +90,10 @@ export class PrompterRoom {
 
     const cleanup = () => {
       this.sessions.delete(ws);
+      if (role === 'anchor' && this.lastState.anchorProgress[anchorRole]) {
+        delete this.lastState.anchorProgress[anchorRole];
+        this.broadcast({ type: 'anchorProgress', payload: { role: anchorRole, progress: null } });
+      }
       this.broadcastPresence();
     };
     ws.addEventListener('close', cleanup);
@@ -102,8 +106,16 @@ export class PrompterRoom {
 
     if (role === 'director' && msg.type === 'command') {
       this.updateStateFromDirector(msg.payload);
-      // P0 修复：向所有人（包含发送者导播自身）广播最新状态，保证导播 UI 按钮即时同步
-      this.broadcast({ type: 'state', payload: this.lastState });
+      // P0 修复：导播 command 广播只包含本次修改增量及必要的派生字段，避免用服务端过时的 scrollRatio 覆盖主播端本地滑动进度
+      this.broadcast({
+        type: 'state',
+        payload: {
+          ...msg.payload,
+          hasPassword: !!this.password,
+          expiresAt: this.expiresAt,
+          updatedAt: this.lastState.updatedAt,
+        },
+      });
     } else if (role === 'director' && msg.type === 'action') {
       // P0 修复：转发 action 消息（例如一键警示召回 flashCue）
       this.broadcast({ type: 'action', payload: msg.payload });
@@ -132,6 +144,16 @@ export class PrompterRoom {
       password: this.password,
       expiresAt: this.expiresAt,
     }).catch(() => {});
+
+    if (this.expiresAt) {
+      this.state.storage.setAlarm(this.expiresAt).catch(() => {});
+    }
+  }
+
+  async alarm() {
+    if (this.expiresAt && Date.now() >= this.expiresAt) {
+      await this.state.storage.deleteAll();
+    }
   }
 
   broadcast(message, exclude) {

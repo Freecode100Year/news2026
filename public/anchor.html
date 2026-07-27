@@ -321,9 +321,62 @@
     }
   }
 
-  document.getElementById('connectBtn').addEventListener('click', connectRoom);
+  let pingTimer = null;
+  let pongTimeoutTimer = null;
+  let reconnectTimer = null;
+  let reconnectAttempts = 0;
+  let isManualClose = false;
 
-  function connectRoom() {
+  function startHeartbeat() {
+    stopHeartbeat();
+    pingTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping', t: Date.now() }));
+        pongTimeoutTimer = setTimeout(() => {
+          if (ws) {
+            console.warn('主播端心跳超时，强制关闭触发重连');
+            ws.close();
+          }
+        }, 5000);
+      }
+    }, 15000);
+  }
+
+  function stopHeartbeat() {
+    if (pingTimer) clearInterval(pingTimer);
+    if (pongTimeoutTimer) clearTimeout(pongTimeoutTimer);
+    pingTimer = null;
+    pongTimeoutTimer = null;
+  }
+
+  function handlePong() {
+    if (pongTimeoutTimer) {
+      clearTimeout(pongTimeoutTimer);
+      pongTimeoutTimer = null;
+    }
+  }
+
+  function scheduleReconnect() {
+    if (isManualClose) return;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+
+    const delays = [1000, 2000, 5000, 10000];
+    const delay = delays[Math.min(reconnectAttempts, delays.length - 1)];
+    reconnectAttempts++;
+
+    showToast(`⚠️ 网络开散，${delay / 1000}s 后自动重连...`, 'warning', delay);
+    reconnectTimer = setTimeout(() => {
+      connectRoom(true);
+    }, delay);
+  }
+
+  document.getElementById('connectBtn').addEventListener('click', () => {
+    isManualClose = false;
+    reconnectAttempts = 0;
+    connectRoom(false);
+  });
+
+  function connectRoom(isAutoReconnect = false) {
     const room = roomInput.value.trim().toUpperCase();
     const pass = passInput.value.trim();
     const server = serverInput.value.trim().replace(/\/$/, '');
@@ -335,19 +388,26 @@
       ws.onclose = null;
       ws.close();
     }
+    stopHeartbeat();
 
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
+      reconnectAttempts = 0;
+      startHeartbeat();
       hasConnectedOnce = true;
       setup.style.display = 'none';
       document.getElementById('tally').className = 'tally live';
       document.getElementById('roomLabel').textContent = `房间: ${room}`;
-      showToast('🌐 已成功与导播控制台连通', 'success');
+      showToast(isAutoReconnect ? '🔄 已自动恢复与导播控制台的连接' : '🌐 已成功与导播控制台连通', 'success');
     };
 
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
+      if (msg.type === 'pong') {
+        handlePong();
+        return;
+      }
       if (msg.type === 'state') {
         state = { ...state, ...msg.payload };
         localStorage.setItem('anchor_cached_state', JSON.stringify(state));
@@ -359,16 +419,17 @@
           stopScrollLoop();
         }
       } else if (msg.type === 'action' && msg.payload === 'flashCue') {
-        // P0 修复：成功接收到导播一键召回警示
         showToast('⚠️ 导播提示：请注意最新稿件调整！', 'warning', 5000);
       }
     };
 
     ws.onerror = () => { showError('连接错误或密码无效'); };
     ws.onclose = (e) => {
+      stopHeartbeat();
       document.getElementById('tally').className = 'tally local';
       if (hasConnectedOnce) {
         showToast('⚠️ 网络已断开，提词器维持本地流畅模式', 'warning', 4000);
+        scheduleReconnect();
       }
       if (setup.style.display !== 'none') showError(e.reason || '无法进入房间，请检查密码或房间码');
     };

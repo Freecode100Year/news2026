@@ -353,18 +353,44 @@
     bindControlEvents();
   });
 
-  // P1 修复：绑定速度 slider、字号 slider 和倒计时按钮事件
+  // 简易节流辅助函数，避免滑杆拖动引发高频网络和 DO 存储写入
+  function throttle(func, wait) {
+    let timeout = null;
+    let previous = 0;
+    return function(...args) {
+      const now = Date.now();
+      const remaining = wait - (now - previous);
+      if (remaining <= 0 || remaining > wait) {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
+        previous = now;
+        func.apply(this, args);
+      } else if (!timeout) {
+        timeout = setTimeout(() => {
+          previous = Date.now();
+          timeout = null;
+          func.apply(this, args);
+        }, remaining);
+      }
+    };
+  }
+
+  // P1 修复：绑定速度 slider、字号 slider 和倒计时按钮事件，并增加 120ms 节流
   function bindControlEvents() {
+    const sendSpeedCmd = throttle((speed) => sendCmd({ speed }), 120);
     document.getElementById('speedSlider').addEventListener('input', (e) => {
       const speed = parseFloat(e.target.value);
       document.getElementById('speedVal').textContent = `${speed}×`;
-      sendCmd({ speed: speed });
+      sendSpeedCmd(speed);
     });
 
+    const sendFontCmd = throttle((fontSize) => sendCmd({ fontSize }), 120);
     document.getElementById('fontSlider').addEventListener('input', (e) => {
       const fontSize = parseInt(e.target.value);
       document.getElementById('fontVal').textContent = `${fontSize}px`;
-      sendCmd({ fontSize: fontSize });
+      sendFontCmd(fontSize);
     });
 
     document.getElementById('startCdBtn').addEventListener('click', () => {
@@ -425,13 +451,67 @@
     insertTag(ts);
   }
 
-  connectBtn.addEventListener('click', connectRoom);
+  let pingTimer = null;
+  let pongTimeoutTimer = null;
+  let reconnectTimer = null;
+  let reconnectAttempts = 0;
+  let isManualClose = false;
 
-  function connectRoom() {
+  function startHeartbeat() {
+    stopHeartbeat();
+    pingTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping', t: Date.now() }));
+        pongTimeoutTimer = setTimeout(() => {
+          if (ws) {
+            console.warn('导播端心跳超时，强制关闭触发重连');
+            ws.close();
+          }
+        }, 5000);
+      }
+    }, 15000);
+  }
+
+  function stopHeartbeat() {
+    if (pingTimer) clearInterval(pingTimer);
+    if (pongTimeoutTimer) clearTimeout(pongTimeoutTimer);
+    pingTimer = null;
+    pongTimeoutTimer = null;
+  }
+
+  function handlePong() {
+    if (pongTimeoutTimer) {
+      clearTimeout(pongTimeoutTimer);
+      pongTimeoutTimer = null;
+    }
+  }
+
+  function scheduleReconnect() {
+    if (isManualClose) return;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+
+    const delays = [1000, 2000, 5000, 10000];
+    const delay = delays[Math.min(reconnectAttempts, delays.length - 1)];
+    reconnectAttempts++;
+
+    showToast(`⚠️ 网络断开，${delay / 1000}s 后尝试自动重连...`, 'warning', delay);
+    reconnectTimer = setTimeout(() => {
+      connectRoom(true);
+    }, delay);
+  }
+
+  connectBtn.addEventListener('click', () => {
+    isManualClose = false;
+    reconnectAttempts = 0;
+    connectRoom(false);
+  });
+
+  function connectRoom(isAutoReconnect = false) {
     if (ws) {
       ws.onclose = null;
       ws.close();
     }
+    stopHeartbeat();
 
     roomCode = roomInput.value.trim().toUpperCase();
     if (!roomCode) {
@@ -449,12 +529,14 @@
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
+      reconnectAttempts = 0;
+      startHeartbeat();
       hasConnectedOnce = true;
       connDot.className = 'dot on';
       roomText.textContent = `房间: ${roomCode}`;
       document.getElementById('showQrBtn').disabled = false;
       document.getElementById('copyLinkBtn').disabled = false;
-      showToast('✅ 成功连入导播房间，云端同步已就绪', 'success');
+      showToast(isAutoReconnect ? '🔄 已自动重新连入导播房间' : '✅ 成功连入导播房间，云端同步已就绪', 'success');
 
       sendCmd({ password: roomPass, expiresAt: expiresAt });
 
@@ -467,6 +549,10 @@
 
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
+      if (msg.type === 'pong') {
+        handlePong();
+        return;
+      }
       if (msg.type === 'state') {
         state = { ...state, ...msg.payload };
         renderState();
@@ -474,21 +560,28 @@
         anchorDot.className = msg.payload.anchorOnline ? 'dot on' : 'dot off';
         anchorText.textContent = `主播端 (${msg.payload.anchorCount})`;
       } else if (msg.type === 'anchorProgress') {
-        state.anchorProgress[msg.payload.role] = msg.payload.progress;
+        if (msg.payload.progress === null) {
+          delete state.anchorProgress[msg.payload.role];
+        } else {
+          state.anchorProgress[msg.payload.role] = msg.payload.progress;
+        }
         updateEyeTrackerUI();
       }
     };
 
     ws.onerror = () => {
+      stopHeartbeat();
       showToast('⚠️ 房间握手失败，请检查密码或输入有效房间码', 'error');
     };
 
     ws.onclose = () => {
+      stopHeartbeat();
       connDot.className = 'dot off';
       roomText.textContent = '断开 (离线)';
       document.getElementById('showQrBtn').disabled = true;
       if (hasConnectedOnce) {
-        showToast('⚠️ 通道已断开，修改将自动暂存本地', 'warning');
+        showToast('⚠️ 控制台离线，进入离线编辑防丢模式', 'warning');
+        scheduleReconnect();
       }
     };
   }
