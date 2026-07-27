@@ -1,5 +1,7 @@
 # 新闻直播双端提词系统 (News Prompter 2.4)
 
+> 🔗 **在线体验与生产体验入口**：[https://ticiqi.freedom8964.com/](https://ticiqi.freedom8964.com/)
+
 > **最新版本 2.4.1 (2026-07-27) 核心稳定性重构与 Bug 修复更新**：
 > - 🐛 **[P0] 彻底修复 `scrollRatio` 覆盖跳变 Bug**：导播端调速/调字号/镜像操作改为广播增量 command 消息，不再带过时的 `scrollRatio` 快照，完美兑现“临场无感改稿与操作零跳变”。
 > - 📡 **[P0] WebSocket 自动心跳与指数退避重连**：客户端（主播端/导播端）增加 15s 定时 `ping`/`pong` 链路检测与 1s->2s->5s->10s 退避自动重连，保障直播高可靠抗抖动。
@@ -47,7 +49,7 @@ npx wrangler dev
 npx wrangler deploy
 ```
 
-生产域名：`ticiqi.freedom8964.com`
+生产域名：[https://ticiqi.freedom8964.com/](https://ticiqi.freedom8964.com/)
 
 ---
 
